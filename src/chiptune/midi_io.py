@@ -1,6 +1,7 @@
 """Read a MIDI file into a Score."""
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pretty_midi
@@ -26,16 +27,24 @@ def load_midi(path: str | Path, role_map: dict[int, Role] | None = None) -> Scor
     pm = pretty_midi.PrettyMIDI(str(path))
     roles = DEFAULT_TRACK_ROLES if role_map is None else role_map
 
-    tempi_times, tempi = pm.get_tempo_changes()
+    _, tempi = pm.get_tempo_changes()
     bpm = float(tempi[0]) if len(tempi) else 120.0
+    if len(tempi) > 1:
+        print(
+            f"warning: {path} has {len(tempi)} tempo changes; using the first "
+            f"({bpm} bpm) for the whole grid - later sections may drift",
+            file=sys.stderr,
+        )
 
+    dropped_percussion: list[int] = []
     notes: list[NoteEvent] = []
     for idx, inst in enumerate(pm.instruments):
         if inst.is_drum:
             for n in inst.notes:
                 kind = GM_PERCUSSION.get(n.pitch)
                 if kind is None:
-                    continue  # unmapped percussion is dropped, not guessed at
+                    dropped_percussion.append(n.pitch)  # unmapped percussion is dropped, not guessed at
+                    continue
                 notes.append(NoteEvent(
                     pitch=n.pitch, start=float(n.start), end=float(n.end),
                     velocity=n.velocity, role=Role.PERCUSSION, percussion=kind,
@@ -48,6 +57,13 @@ def load_midi(path: str | Path, role_map: dict[int, Role] | None = None) -> Scor
                 pitch=n.pitch, start=float(n.start), end=float(n.end),
                 velocity=n.velocity, role=role,
             ))
+
+    if dropped_percussion:
+        print(
+            f"warning: dropped {len(dropped_percussion)} unmapped percussion "
+            f"note(s), MIDI pitch(es) {sorted(set(dropped_percussion))}",
+            file=sys.stderr,
+        )
 
     notes.sort(key=lambda n: (n.start, n.pitch))
     duration = max((n.end for n in notes), default=0.0)

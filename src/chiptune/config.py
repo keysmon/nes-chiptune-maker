@@ -9,10 +9,13 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TypeVar
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "nes.toml"
 
 VALID_DUTIES = (0.125, 0.25, 0.5, 0.75)
+VALID_DRUM_KEYS = frozenset({"kick", "snare", "hat"})
+VALID_LEVEL_KEYS = frozenset({"pulse1", "pulse2", "triangle", "noise"})
 
 
 @dataclass(frozen=True)
@@ -87,6 +90,9 @@ class Config:
     levels: dict[str, float] = field(default_factory=dict)
 
 
+_T = TypeVar("_T", bound=ChannelConfig)
+
+
 def load_config(path: str | Path | None = None) -> Config:
     path = Path(path) if path is not None else DEFAULT_CONFIG_PATH
     if not path.exists():
@@ -95,12 +101,27 @@ def load_config(path: str | Path | None = None) -> Config:
     with path.open("rb") as fh:
         raw = tomllib.load(fh)
 
-    def channel(name: str, cls=ChannelConfig):
+    def channel(name: str, cls: type[_T] = ChannelConfig) -> _T:
         if name not in raw:
             raise ValueError(f"config {path} is missing required [{name}] section")
         return cls(**raw[name])
 
-    drums = {k: DrumVoice(**v) for k, v in raw.get("drums", {}).items()}
+    raw_drums = raw.get("drums", {})
+    bad_drums = set(raw_drums) - VALID_DRUM_KEYS
+    if bad_drums:
+        raise ValueError(
+            f"config {path} has unknown [drums.{sorted(bad_drums)[0]}] section; "
+            f"drums must be one of {sorted(VALID_DRUM_KEYS)}"
+        )
+    drums = {k: DrumVoice(**v) for k, v in raw_drums.items()}
+
+    raw_levels = raw.get("levels", {})
+    bad_levels = set(raw_levels) - VALID_LEVEL_KEYS
+    if bad_levels:
+        raise ValueError(
+            f"config {path} has unknown [levels] key {sorted(bad_levels)[0]!r}; "
+            f"levels must be one of {sorted(VALID_LEVEL_KEYS)}"
+        )
 
     return Config(
         sample_rate=raw["sample_rate"],
@@ -111,5 +132,5 @@ def load_config(path: str | Path | None = None) -> Config:
         triangle=channel("triangle"),
         noise=channel("noise"),
         drums=drums,
-        levels=raw.get("levels", {}),
+        levels=raw_levels,
     )

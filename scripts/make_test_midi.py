@@ -68,8 +68,10 @@ def main() -> None:
             add(harmony, p, off + bar * BAR, BAR * 0.98, vel=85)
 
     # Lead: sustained note overlapping a fast moving line, so a sustained voice
-    # must be stolen mid-note and the hysteresis path is reachable.
-    add(lead, 79, off, BAR * 2, vel=105)                     # long sustain, 2 bars
+    # must be stolen mid-note and the hysteresis path is reachable. Pitch 84 is
+    # used (not 76-80) so the moving line below never emits it and cuts the
+    # sustain short with its own note-off.
+    add(lead, 84, off, BAR * 2, vel=105)                     # long sustain, 2 bars
     for i in range(16):
         add(lead, 76 + (i % 5), off + BAR + i * (BEAT / 4), BEAT / 4 * 0.9, vel=95)
 

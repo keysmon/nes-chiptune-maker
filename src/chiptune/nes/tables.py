@@ -7,8 +7,6 @@ property of the hardware, not an approximation on our side.
 """
 from __future__ import annotations
 
-import math
-
 CPU_NTSC = 1789773           # Hz
 PERIOD_MAX = 2047            # 11-bit register
 PERIOD_MIN = 1
