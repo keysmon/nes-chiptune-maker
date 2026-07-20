@@ -43,13 +43,15 @@ def test_playability_matches_the_period_limits():
     assert playable_on_pulse(60)
     assert playable_on_triangle(36)
     # NOTE: originally `assert not playable_on_triangle(120)` with the comment
-    # "too high: period collapses below 1". That claim is false for this hardware.
-    # Triangle's period only drops below 1 above CPU_NTSC / 64 ~= 27965 Hz, which
-    # needs MIDI pitch ~141 - outside 0-127 entirely. MIDI's own ceiling (pitch 127,
-    # ~12544 Hz) only reaches period ~3.46, still comfortably >= 1. So no valid MIDI
-    # pitch can ever be "too high" for the triangle channel under NTSC timing;
-    # pitch 120 (period ~5.68) is genuinely playable, hence the flipped assertion.
-    assert playable_on_triangle(120)
+    # "too high: period collapses below 1". That claim is unreachable for this
+    # hardware: triangle's period only drops below 1 above CPU_NTSC / 64 ~= 27965 Hz,
+    # which needs MIDI pitch ~141 - outside 0-127 entirely. MIDI's own ceiling (pitch
+    # 127, ~12544 Hz) only reaches period ~3.46, still comfortably >= 1. So no valid
+    # MIDI pitch can ever be "too high" for triangle under NTSC timing - there is no
+    # positive rejection case for that direction to test. The channel's real, reachable
+    # rejection is the same direction as pulse's: too *low* a frequency makes the
+    # period exceed 2047 (pitch 20 -> period ~2153.8, over the 11-bit register).
+    assert not playable_on_triangle(20)   # too low: period would exceed 2047
 
 
 def test_cpu_clock_is_ntsc():
