@@ -1,0 +1,74 @@
+# NES 2A03 chiptune configuration.
+# Every value in this file is a taste knob. Nothing tasteful is hardcoded in Python.
+
+sample_rate = 44100
+frame_rate  = 60.0        # 2A03 frame clock; NTSC is really 60.0988
+
+[arrange]
+subdivision              = 16     # quantize onsets to 1/16 notes
+quantize_strength        = 0.85   # 1.0 snaps hard and kills groove; 0.0 is a no-op
+min_duration             = 0.03   # seconds; floor so quantization can't zero a note
+arpeggio_frames          = 2      # frames per chord tone; lower = smoother fusion, higher = audible cycling
+bass_low                 = 28     # MIDI E1; fold bass below this up an octave
+bass_high                = 55     # MIDI G3; fold bass above this down an octave
+borrow_enabled           = false  # Phase 4 feature; role-locked until then
+borrow_idle_frames       = 30     # channel must be idle this long before it can be borrowed
+borrow_hysteresis_frames = 15     # delay before handing a borrowed channel back
+
+# duty: 0.125 / 0.25 / 0.5 / 0.75 are the only values the real chip supports
+[pulse1]                          # lead
+duty = 0.5
+volume = 12
+attack_frames = 0
+decay_frames = 4
+sustain = 0.8
+release_frames = 3
+
+[pulse2]                          # harmony
+duty = 0.25
+volume = 8
+attack_frames = 0
+decay_frames = 6
+sustain = 0.7
+release_frames = 4
+
+[triangle]                        # bass. volume is fixed by hardware; see note below.
+duty = 0.0
+volume = 15
+attack_frames = 0
+decay_frames = 0
+sustain = 1.0
+release_frames = 0
+
+[noise]                           # drums
+duty = 0.0
+volume = 10
+attack_frames = 0
+decay_frames = 2
+sustain = 0.0
+release_frames = 1
+
+[drums.kick]
+period_index = 10                 # index into the 16-entry NTSC noise period table
+mode = "long"
+volume = 13
+frames = 4
+
+[drums.snare]
+period_index = 6
+mode = "long"
+volume = 12
+frames = 6
+
+[drums.hat]
+period_index = 2
+mode = "long"
+volume = 6
+frames = 2
+
+# Relative channel trim applied before the non-linear mixer.
+[levels]
+pulse1 = 1.0
+pulse2 = 0.85
+triangle = 1.0
+noise = 0.7
