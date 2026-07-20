@@ -22,6 +22,7 @@ import math
 from ..config import Config
 from ..nes.tables import playable_on_pulse, playable_on_triangle
 from ..score import NoteEvent, Role, Score
+from .arpeggio import arpeggiate
 from .timeline import SILENT, ChannelId, ChannelTimeline, FrameEvent
 
 
@@ -126,10 +127,17 @@ def allocate(score: Score, cfg: Config) -> dict[ChannelId, ChannelTimeline]:
     triangle = _build_pitched_timeline(
         ChannelId.TRIANGLE, folded, cfg.triangle, fixed_volume=True)
 
+    # --- Pulse 2: harmony, arpeggiated ---
+    harmony = [nt for nt in score.notes_with_role(Role.HARMONY)
+               if playable_on_pulse(nt.pitch)]
+    harmony_pitches = arpeggiate(harmony, n, fr, cfg.arrange.arpeggio_frames)
+    pulse2 = _build_pitched_timeline(
+        ChannelId.PULSE2, harmony_pitches, cfg.pulse2, fixed_volume=False)
+
     empty = lambda ch: ChannelTimeline(channel=ch, frames=[SILENT] * n)
     return {
         ChannelId.PULSE1: pulse1,
-        ChannelId.PULSE2: empty(ChannelId.PULSE2),   # Task 8
+        ChannelId.PULSE2: pulse2,
         ChannelId.TRIANGLE: triangle,
         ChannelId.NOISE: empty(ChannelId.NOISE),     # Task 9
     }
