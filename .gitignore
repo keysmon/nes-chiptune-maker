@@ -1,0 +1,23 @@
+# AI-workflow scaffolding stays local (never pushed)
+CLAUDE.md
+.claude/
+docs/superpowers/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Pipeline artifacts
+cache/
+out/
+renders/
+models/
+
+# OS / IDE
+.DS_Store
+.idea/
+.superpowers/
