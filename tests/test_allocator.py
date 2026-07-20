@@ -1,6 +1,7 @@
 import pytest
 
 from chiptune.config import load_config
+from chiptune.nes.tables import playable_on_pulse
 from chiptune.score import NoteEvent, Role, Score, TempoGrid
 from chiptune.arrange.timeline import ChannelId, FrameEvent
 from chiptune.arrange.allocator import allocate, fold_into_range
@@ -94,3 +95,20 @@ def test_unplayable_pitches_are_dropped_not_clamped(cfg):
     tl = allocate(s, cfg)[ChannelId.TRIANGLE]
     sounded = [f.pitch for f in tl.frames if f.pitch is not None]
     assert all(cfg.arrange.bass_low <= p <= cfg.arrange.bass_high for p in sounded)
+
+
+def test_unplayable_lead_pitch_is_dropped_to_silence(cfg):
+    """Exercises the only reachable drop path.
+
+    Bass pitches are octave-folded into a range that is always playable, so
+    that drop branch can't fire; lead notes are filtered without folding, so
+    an unplayable lead pitch must silence its frames rather than sound a
+    wrong (clamped) note.
+
+    MIDI pitch 20 is far too low for the pulse channel: its exact period is
+    ~4308, well above the 11-bit register max of 2047.
+    """
+    assert not playable_on_pulse(20), "pitch 20 must be genuinely unplayable on pulse"
+    s = score_of([NoteEvent(20, 0.0, 0.5, 100, Role.LEAD)])
+    tl = allocate(s, cfg)[ChannelId.PULSE1]
+    assert all(f.pitch is None for f in tl.frames)
