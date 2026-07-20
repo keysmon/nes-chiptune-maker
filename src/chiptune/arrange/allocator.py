@@ -23,6 +23,7 @@ from ..config import Config
 from ..nes.tables import playable_on_pulse, playable_on_triangle
 from ..score import NoteEvent, Role, Score
 from .arpeggio import arpeggiate
+from .percussion import allocate_percussion
 from .timeline import SILENT, ChannelId, ChannelTimeline, FrameEvent
 
 
@@ -134,10 +135,16 @@ def allocate(score: Score, cfg: Config) -> dict[ChannelId, ChannelTimeline]:
     pulse2 = _build_pitched_timeline(
         ChannelId.PULSE2, harmony_pitches, cfg.pulse2, fixed_volume=False)
 
-    empty = lambda ch: ChannelTimeline(channel=ch, frames=[SILENT] * n)
+    # --- Noise: percussion ---
+    perc = score.notes_with_role(Role.PERCUSSION)
+    noise = ChannelTimeline(
+        channel=ChannelId.NOISE,
+        frames=allocate_percussion(perc, n, fr, cfg.drums),
+    )
+
     return {
         ChannelId.PULSE1: pulse1,
         ChannelId.PULSE2: pulse2,
         ChannelId.TRIANGLE: triangle,
-        ChannelId.NOISE: empty(ChannelId.NOISE),     # Task 9
+        ChannelId.NOISE: noise,
     }
