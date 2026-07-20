@@ -1,0 +1,96 @@
+import pytest
+
+from chiptune.config import load_config
+from chiptune.score import NoteEvent, Role, Score, TempoGrid
+from chiptune.arrange.timeline import ChannelId, FrameEvent
+from chiptune.arrange.allocator import allocate, fold_into_range
+
+
+def score_of(notes, duration=2.0):
+    return Score(tempo=TempoGrid(120.0, 0.0, 4), notes=notes, duration=duration)
+
+
+@pytest.fixture
+def cfg():
+    return load_config()
+
+
+def test_fold_into_range_raises_low_notes_by_octaves():
+    assert fold_into_range(12, low=28, high=55) == 36     # +2 octaves
+    assert fold_into_range(24, low=28, high=55) == 36
+
+
+def test_fold_into_range_lowers_high_notes_by_octaves():
+    assert fold_into_range(72, low=28, high=55) == 48
+
+
+def test_fold_into_range_leaves_in_range_notes_alone():
+    assert fold_into_range(40, low=28, high=55) == 40
+
+
+def test_lead_note_occupies_its_frames_on_pulse1(cfg):
+    s = score_of([NoteEvent(72, 0.0, 0.5, 100, Role.LEAD)])
+    tl = allocate(s, cfg)[ChannelId.PULSE1]
+    # 60 fps, 0.5 s -> frames 0..29 sounding, frame 30 silent
+    assert tl.frames[0].pitch == 72
+    assert tl.frames[29].pitch == 72
+    assert tl.frames[30].pitch is None
+
+
+def test_overlapping_lead_notes_keep_the_highest(cfg):
+    s = score_of([
+        NoteEvent(72, 0.0, 0.5, 100, Role.LEAD),
+        NoteEvent(76, 0.0, 0.5, 100, Role.LEAD),
+        NoteEvent(69, 0.0, 0.5, 100, Role.LEAD),
+    ])
+    tl = allocate(s, cfg)[ChannelId.PULSE1]
+    assert tl.frames[5].pitch == 76
+
+
+def test_overlapping_bass_notes_keep_the_lowest(cfg):
+    s = score_of([
+        NoteEvent(36, 0.0, 0.5, 100, Role.BASS),
+        NoteEvent(48, 0.0, 0.5, 100, Role.BASS),
+    ])
+    tl = allocate(s, cfg)[ChannelId.TRIANGLE]
+    assert tl.frames[5].pitch == 36
+
+
+def test_bass_is_folded_into_the_triangle_range(cfg):
+    s = score_of([NoteEvent(12, 0.0, 0.5, 100, Role.BASS)])
+    tl = allocate(s, cfg)[ChannelId.TRIANGLE]
+    assert cfg.arrange.bass_low <= tl.frames[0].pitch <= cfg.arrange.bass_high
+
+
+def test_triangle_volume_never_varies(cfg):
+    """Hardware invariant: the triangle channel has no volume control."""
+    s = score_of([
+        NoteEvent(36, 0.0, 0.5, 20, Role.BASS),
+        NoteEvent(38, 0.5, 1.0, 127, Role.BASS),
+    ])
+    tl = allocate(s, cfg)[ChannelId.TRIANGLE]
+    volumes = {f.volume for f in tl.frames if f.pitch is not None}
+    assert len(volumes) == 1, f"triangle volume varied: {volumes}"
+
+
+def test_six_simultaneous_lead_notes_reduce_to_one_sounding_pitch(cfg):
+    """Hardware invariant, spec 6.1: one note per channel per frame."""
+    s = score_of([NoteEvent(60 + i, 0.0, 0.5, 100, Role.LEAD) for i in range(6)])
+    tl = allocate(s, cfg)[ChannelId.PULSE1]
+    sounding = [f.pitch for f in tl.frames[:30]]
+    assert sounding == [65] * 30, "must reduce to the single highest pitch (60+5)"
+    assert all(f.pitch is None for f in tl.frames[30:])
+
+
+def test_all_four_channels_are_always_returned(cfg):
+    s = score_of([NoteEvent(72, 0.0, 0.5, 100, Role.LEAD)])
+    out = allocate(s, cfg)
+    assert set(out) == set(ChannelId)
+
+
+def test_unplayable_pitches_are_dropped_not_clamped(cfg):
+    """A pitch outside the register range must not silently become a wrong note."""
+    s = score_of([NoteEvent(126, 0.0, 0.5, 100, Role.BASS)])
+    tl = allocate(s, cfg)[ChannelId.TRIANGLE]
+    sounded = [f.pitch for f in tl.frames if f.pitch is not None]
+    assert all(cfg.arrange.bass_low <= p <= cfg.arrange.bass_high for p in sounded)
