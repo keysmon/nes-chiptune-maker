@@ -1,4 +1,3 @@
-# src/chiptune/midi_io.py
 """Read a MIDI file into a Score."""
 from __future__ import annotations
 

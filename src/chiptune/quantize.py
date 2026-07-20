@@ -1,4 +1,3 @@
-# src/chiptune/quantize.py
 """Snap note onsets to the tempo grid and pitches to semitones.
 
 Mandatory, not optional: raw pitch tracking produces vibrato, glissando, and
@@ -31,6 +30,8 @@ def quantize_score(
         raise ValueError(f"strength must be in [0, 1] (got {strength})")
     if subdivision <= 0:
         raise ValueError(f"subdivision must be positive (got {subdivision})")
+    if min_duration <= 0:
+        raise ValueError(f"min_duration must be positive (got {min_duration})")
 
     step = score.tempo.seconds_per_beat * 4.0 / subdivision
     offset = score.tempo.offset

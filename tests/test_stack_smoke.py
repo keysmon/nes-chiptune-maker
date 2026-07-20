@@ -78,9 +78,10 @@ def test_demucs_separates_synthetic_signal_into_four_stems():
     _, stems = separator.separate_tensor(wav, sr=sr)
 
     assert set(stems.keys()) == {"drums", "bass", "other", "vocals"}
+    for name, stem in stems.items():
+        assert stem.shape == wav.shape, f"{name} stem shape {tuple(stem.shape)} != input {tuple(wav.shape)}"
 
 
-@pytest.mark.slow
 @pytest.mark.skipif(not _IS_ARM64_MACOS, reason="MPS is only expected on arm64 macOS")
 def test_torch_mps_available():
     import torch

@@ -1,4 +1,3 @@
-# src/chiptune/config.py
 """Typed loader for config/nes.toml.
 
 Every taste-sensitive value lives in TOML, never in Python. This is the

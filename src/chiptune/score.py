@@ -1,4 +1,3 @@
-# src/chiptune/score.py
 """Chip-agnostic musical score.
 
 This is the seam between the analysis half (separation, transcription) and the
@@ -9,6 +8,7 @@ on a pulse channel and fight the 60 Hz frame clock.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 
@@ -38,6 +38,10 @@ class NoteEvent:
     percussion: Percussion | None = None
 
     def __post_init__(self) -> None:
+        if not math.isfinite(self.start) or not math.isfinite(self.end):
+            raise ValueError(
+                f"start and end must be finite (got start={self.start}, end={self.end})"
+            )
         if self.end <= self.start:
             raise ValueError(f"end must be after start (got {self.start} -> {self.end})")
         if not 0 <= self.pitch <= 127:
@@ -96,7 +100,7 @@ class Score:
                         "end": n.end,
                         "velocity": n.velocity,
                         "role": n.role.value,
-                        "percussion": n.percussion.value if n.percussion else None,
+                        "percussion": n.percussion.value if n.percussion is not None else None,
                     }
                     for n in self.notes
                 ],
@@ -117,7 +121,7 @@ class Score:
                     end=n["end"],
                     velocity=n["velocity"],
                     role=Role(n["role"]),
-                    percussion=Percussion(n["percussion"]) if n["percussion"] else None,
+                    percussion=Percussion(n["percussion"]) if n["percussion"] is not None else None,
                 )
                 for n in raw["notes"]
             ],
