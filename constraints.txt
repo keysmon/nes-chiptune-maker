@@ -1,0 +1,4 @@
+# resampy (transitive via basic-pitch) imports pkg_resources, removed in setuptools 81+.
+# Verified 2026-07-20: without this pin, `import basic_pitch.inference` raises
+# ModuleNotFoundError: No module named 'pkg_resources'
+setuptools<81
