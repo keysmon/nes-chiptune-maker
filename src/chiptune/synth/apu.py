@@ -17,7 +17,13 @@ import numpy as np
 
 from ..arrange.timeline import ChannelId, ChannelTimeline
 from ..config import Config
-from ..nes.tables import midi_to_hz, pulse_period, pulse_period_to_hz
+from ..nes.tables import (
+    midi_to_hz,
+    pulse_period,
+    pulse_period_to_hz,
+    triangle_period,
+    triangle_period_to_hz,
+)
 from .noise import render_noise
 from .pulse import PulseBank
 from .triangle import render_triangle
@@ -33,6 +39,13 @@ def _frame_sample_bounds(frame: int, sample_rate: int, frame_rate: float) -> tup
 def _quantized_pulse_hz(pitch: int) -> float:
     """Route through the period register so pitch carries the chip's own quantization."""
     return pulse_period_to_hz(pulse_period(midi_to_hz(pitch)))
+
+
+def _quantized_triangle_hz(pitch: int) -> float:
+    """Triangle counterpart of _quantized_pulse_hz: the triangle has its own /32
+    period register, so its pitch must carry the same chip quantization the pulses do
+    rather than sound at the ideal frequency."""
+    return triangle_period_to_hz(triangle_period(midi_to_hz(pitch)))
 
 
 def render_channels(
@@ -82,7 +95,7 @@ def render_channels(
         if a >= b or ev.pitch is None:
             continue
         wave, phases[ChannelId.TRIANGLE] = render_triangle(
-            midi_to_hz(ev.pitch), b - a, sr, phases[ChannelId.TRIANGLE])
+            _quantized_triangle_hz(ev.pitch), b - a, sr, phases[ChannelId.TRIANGLE])
         tri_buf[a:b] = wave * tri_level
 
     noise_buf = out[ChannelId.NOISE]
