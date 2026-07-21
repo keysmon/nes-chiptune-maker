@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from chiptune.analysis import vocals as V
 from chiptune.analysis.vocals import transcribe_vocals
 from chiptune.score import Role
 
@@ -26,6 +27,35 @@ def test_silence_returns_no_notes():
     y = np.zeros(sr, dtype="float32")
     notes = transcribe_vocals(y, sr, fmin=80, fmax=1000)
     assert notes == []
+
+
+def test_voiced_frame_with_nonfinite_f0_does_not_emit_pitch_zero_note(monkeypatch):
+    # pyin can (in principle, on a future version) flag a frame voiced=True
+    # while f0 is NaN. np.round(...).astype(int64) casts that NaN to 0 on this
+    # platform, which would otherwise pass through as a bogus MIDI-0 LEAD note.
+    sr = 22050
+    hop = V.HOP_LENGTH
+    n_frames = 20
+
+    f0 = np.full(n_frames, np.nan)
+    voiced = np.zeros(n_frames, dtype=bool)
+    vprob = np.zeros(n_frames)
+
+    # A legit voiced run (A3 = 220Hz -> MIDI 57), frames 0-9.
+    f0[0:10] = 220.0
+    voiced[0:10] = True
+    vprob[0:10] = 0.9
+
+    # frames 10-11 unvoiced (silence gap), then a bogus voiced-but-NaN frame.
+    voiced[12] = True
+    f0[12] = np.nan
+    vprob[12] = 0.9
+
+    monkeypatch.setattr(V.librosa, "pyin", lambda *a, **k: (f0, voiced, vprob))
+
+    notes = transcribe_vocals(np.zeros(n_frames * hop, dtype="float32"), sr, fmin=80, fmax=1000, min_duration=0.0)
+    assert all(n.pitch != 0 for n in notes)
+    assert any(abs(n.pitch - 57) <= 1 for n in notes)  # the legit A3 run still comes through
 
 
 @pytest.mark.slow

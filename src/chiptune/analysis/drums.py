@@ -100,7 +100,7 @@ def transcribe_drums(
         )
 
     print(
-        f"chiptune.analysis.drums: classified {len(notes)} hits - "
+        f"chiptune.analysis.drums: classified {len(notes)} of {len(onsets)} onsets - "
         f"kick={counts[Percussion.KICK]} snare={counts[Percussion.SNARE]} hat={counts[Percussion.HAT]}",
         file=sys.stderr,
     )

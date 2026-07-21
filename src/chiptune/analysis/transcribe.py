@@ -37,10 +37,16 @@ def transcribe_pitched(
 
     notes = []
     for start, end, pitch, amplitude, _pitch_bends in raw_notes:
-        if end - start < min_duration:
+        # `end - start < min_duration` alone misses the degenerate `end == start`
+        # case when min_duration is 0.0 (0 < 0 is False), which would otherwise
+        # reach NoteEvent and crash on its start<end validation.
+        if end <= start or (end - start) < min_duration:
             continue
         velocity = int(np.clip(amplitude * 127, 1, 127))
+        # basic-pitch shouldn't emit out-of-range pitches, but clamp rather
+        # than let a stray one crash the run via NoteEvent's MIDI-range check.
+        clamped_pitch = max(0, min(127, int(round(pitch))))
         notes.append(
-            NoteEvent(pitch=int(pitch), start=float(start), end=float(end), velocity=velocity, role=role)
+            NoteEvent(pitch=clamped_pitch, start=float(start), end=float(end), velocity=velocity, role=role)
         )
     return notes

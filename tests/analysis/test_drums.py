@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from chiptune.analysis import drums as D
 from chiptune.analysis.drums import transcribe_drums
 from chiptune.config import load_config
 from chiptune.score import Role, Percussion
@@ -38,6 +39,23 @@ def test_no_onsets_returns_empty():
     y = np.zeros(sr, dtype="float32")
     hits = transcribe_drums(y, sr, KICK_BAND_HZ, HAT_BAND_HZ, KICK_LOW_FRAC_MIN, HAT_HIGH_FRAC_MIN)
     assert hits == []
+
+
+def test_dropped_short_window_onset_is_still_counted_in_stderr_total(monkeypatch, capsys):
+    # An onset too close to the end of the stem for a meaningful window is
+    # dropped from `notes`, but must still be counted in the "of M onsets"
+    # total so a dropped tail onset isn't silently invisible.
+    sr = 22050
+    y = np.zeros(100, dtype="float32")
+    # onset 0: plenty of stem left, classified normally.
+    # onset 95: only 5 samples left (< MIN_WINDOW_SAMPLES=8), dropped.
+    monkeypatch.setattr(D.librosa.onset, "onset_detect", lambda **kwargs: np.array([0, 95]))
+
+    hits = transcribe_drums(y, sr, KICK_BAND_HZ, HAT_BAND_HZ, KICK_LOW_FRAC_MIN, HAT_HIGH_FRAC_MIN)
+    stderr = capsys.readouterr().err
+
+    assert len(hits) == 1
+    assert "classified 1 of 2 onsets" in stderr
 
 
 @pytest.mark.slow

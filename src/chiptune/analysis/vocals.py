@@ -25,6 +25,12 @@ def transcribe_vocals(
     vocal stem. Notes shorter than `min_duration` seconds are dropped.
     """
     f0, voiced, vprob = librosa.pyin(stem, fmin=fmin, fmax=fmax, sr=sr, hop_length=HOP_LENGTH)
+    # A frame flagged voiced=True but with a non-finite f0 (NaN/inf) would cast
+    # to pitch 0 below and emit a bogus MIDI-0 LEAD note; treat it as unvoiced
+    # instead. pyin already sets f0=NaN whenever voiced=False, so this mask
+    # equals `voiced` on current librosa - it's a guard against a
+    # future/edge-case mismatch, not a behavior change today.
+    voiced = voiced & np.isfinite(f0)
     if not np.any(voiced):
         return []
 
