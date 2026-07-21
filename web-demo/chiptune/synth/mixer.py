@@ -26,7 +26,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-import soundfile as sf
 from scipy.signal import butter, sosfiltfilt
 
 
@@ -110,6 +109,7 @@ def apply_output_filter(
 
 
 def write_wav(path: str | Path, samples: np.ndarray, sample_rate: int) -> None:
+    import soundfile as sf  # lazy: the serverless demo has no libsndfile and writes WAV via stdlib instead
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     sf.write(str(path), samples.astype(np.float32), sample_rate, subtype="PCM_16")

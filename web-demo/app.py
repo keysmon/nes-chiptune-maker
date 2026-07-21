@@ -9,9 +9,9 @@ swaps the two pre-baked Scores. Live song upload runs in the local full app.
 import io
 import os
 import tomllib
+import wave
 
 import numpy as np
-import soundfile as sf
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
@@ -65,9 +65,19 @@ def _render(score: Score, overrides: dict) -> bytes:
                               highpass_hz=cfg.output_highpass_hz,
                               lowpass_hz=cfg.output_lowpass_hz)
     check_invariants(timelines, mix)
-    wav = np.clip(mix, -1.0, 1.0)
+    return _wav_bytes(mix, cfg.sample_rate)
+
+
+def _wav_bytes(samples: np.ndarray, sample_rate: int) -> bytes:
+    """Write a mono 16-bit PCM WAV with the stdlib `wave` module - no soundfile /
+    libsndfile, which isn't available on the serverless runtime."""
+    ints = (np.clip(samples, -1.0, 1.0) * 32767.0).astype("<i2")
     buf = io.BytesIO()
-    sf.write(buf, wav.astype(np.float32), cfg.sample_rate, subtype="PCM_16", format="WAV")
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sample_rate)
+        w.writeframes(ints.tobytes())
     return buf.getvalue()
 
 
