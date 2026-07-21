@@ -21,7 +21,7 @@ from .midi_io import load_midi
 from .quantize import quantize_score
 from .score import Role, Score
 from .synth.apu import render_channels
-from .synth.mixer import nes_mix, write_wav
+from .synth.mixer import apply_output_filter, nes_mix, write_wav
 
 
 def render_score(score: Score, config_path=None, out_path="out/chiptune.wav") -> Path:
@@ -40,6 +40,13 @@ def render_score(score: Score, config_path=None, out_path="out/chiptune.wav") ->
         channels[ChannelId.PULSE2],
         channels[ChannelId.TRIANGLE],
         channels[ChannelId.NOISE],
+    )
+    # Console output filter runs on the final mixed signal, before the invariant
+    # check, so check_invariants validates what actually gets written to disk.
+    raw_mix = apply_output_filter(
+        raw_mix, cfg.sample_rate,
+        highpass_hz=cfg.output_highpass_hz,
+        lowpass_hz=cfg.output_lowpass_hz,
     )
     # Validate the RAW mix so a genuine clip or NaN fails the build loudly; only
     # then clamp for output, guarding float-epsilon overshoot on a checked signal.
