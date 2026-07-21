@@ -19,9 +19,23 @@ The `setuptools<81` pin in `constraints.txt` is required, not cosmetic:
 
 ## Use
 
+Convert a song (audio in):
+
+```bash
+.venv/bin/python -m chiptune.cli convert song.wav -o out/song_chiptune.wav
+```
+
+Or render a MIDI file directly:
+
 ```bash
 .venv/bin/python -m chiptune.cli render assets/test_theme.mid -o out/theme.wav
 ```
+
+`convert` separates the song into stems (Demucs), transcribes each to notes
+(basic-pitch for bass/other, pyin for vocals, onset+band-energy for drums),
+estimates the tempo, assembles a chip-agnostic `Score`, and renders it through
+the same NES synth `render` uses. It prints the estimated BPM, per-role note
+counts, and a time-resolved chroma similarity to the original.
 
 ## Tuning the sound
 
@@ -32,8 +46,17 @@ sounds never means changing Python.
 
 ## Status
 
-Phase 1 complete: MIDI in, chiptune out. Source separation and audio
-transcription (audio in) are the next plan.
+Both halves complete and merged:
+- **Realization half** (`render`): MIDI/`Score` -> NES chiptune. Band-limited pulse,
+  staircase triangle, LFSR noise, non-linear mixer, hardware-invariant checks.
+- **Analysis half** (`convert`): audio -> `Score`. Demucs separation, basic-pitch /
+  pyin / onset transcription, tempo estimation, config-gated harmony declash.
+
+The two are joined by the serialized `Score`, so the slow ML analysis runs once and
+the fast, deterministic synthesis re-renders in seconds while you tune `config/nes.toml`.
+
+A time-resolved chroma-similarity metric (original vs chiptune) is reported as a tuning
+proxy. It is not a fidelity guarantee - the real judge is listening.
 
 Phase 1 verifies that the pipeline is *structurally* correct - the four-voice
 budget is never exceeded, the triangle never varies volume, every pitch fits an
