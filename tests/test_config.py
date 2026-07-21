@@ -106,3 +106,23 @@ def test_analysis_section_loads():
     assert cfg.analysis.kick_max_hz < cfg.analysis.hat_min_hz
     assert cfg.analysis.min_note_seconds > 0
     assert cfg.analysis.harmony_declash is True
+
+
+def test_rejects_unknown_analysis_key(tmp_path):
+    bad = tmp_path / "bad.toml"
+    bad.write_text(
+        "sample_rate=44100\nframe_rate=60.0\n"
+        "[arrange]\nsubdivision=16\nquantize_strength=1.0\nmin_duration=0.03\n"
+        "arpeggio_frames=2\nbass_low=28\nbass_high=55\nborrow_enabled=false\n"
+        "borrow_idle_frames=30\nborrow_hysteresis_frames=15\n"
+        f"[pulse1]\nduty=0.5\n{VALID_CHANNEL}"
+        f"[pulse2]\nduty=0.25\n{VALID_CHANNEL}"
+        f"[triangle]\nduty=0.0\n{VALID_CHANNEL}"
+        f"[noise]\nduty=0.0\n{VALID_CHANNEL}"
+        "[analysis]\ninclude_vocals=true\nvocal_fmin=80.0\nvocal_fmax=1000.0\n"
+        "min_note_seconds=0.033\nkick_max_hz=150.0\nhat_min_hz=6000.0\n"
+        "onset_backtrack=true\nharmony_declash=true\ndeclash_semitones=1\n"
+        "vocal_fmn=80.0\n"
+    )
+    with pytest.raises(ValueError, match="vocal_fmn"):
+        load_config(bad)
