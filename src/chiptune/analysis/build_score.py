@@ -104,8 +104,14 @@ def build_score(audio_path, cfg: Config, cache_dir=None) -> Score:
         lead, harmony = _skyline_lead(other)
 
     notes = lead + harmony + bass + drums
+    declash_pushed = 0
     if a.harmony_declash:
-        notes = declash_harmony(notes, a.declash_semitones)
+        declashed = declash_harmony(notes, a.declash_semitones)
+        # Count how many harmony notes were actually pushed down: declash is
+        # "the single most likely thing to need tuning at the listen", so make
+        # its effect an observable number rather than a black box.
+        declash_pushed = sum(1 for b, c in zip(notes, declashed) if b.pitch != c.pitch)
+        notes = declashed
 
     # Tempo from the ORIGINAL MIX, not any single stem.
     mono, orig_sr = _load_mono(audio_path)
@@ -118,7 +124,8 @@ def build_score(audio_path, cfg: Config, cache_dir=None) -> Score:
     print(
         f"chiptune.analysis.build_score: {grid.bpm:.1f} BPM; "
         f"lead={counts[Role.LEAD]} harmony={counts[Role.HARMONY]} "
-        f"bass={counts[Role.BASS]} percussion={counts[Role.PERCUSSION]}",
+        f"bass={counts[Role.BASS]} percussion={counts[Role.PERCUSSION]} "
+        f"declash_pushed={declash_pushed}",
         file=sys.stderr,
     )
     return score
