@@ -14,6 +14,7 @@ quantization. This is a considered trade.
 from __future__ import annotations
 
 import numpy as np
+from scipy.signal import butter, sosfiltfilt
 
 from ..arrange.timeline import ChannelId, ChannelTimeline
 from ..config import Config
@@ -46,6 +47,29 @@ def _quantized_triangle_hz(pitch: int) -> float:
     period register, so its pitch must carry the same chip quantization the pulses do
     rather than sound at the ideal frequency."""
     return triangle_period_to_hz(triangle_period(midi_to_hz(pitch)))
+
+
+# A drum hit is not a flat gate of noise: real percussion is a fast attack followed
+# by a decay. Rendering the noise burst at constant amplitude (as a raw rectangular
+# window) sounds abrupt and hissy - the hard edges click and the un-decayed noise
+# reads as a sustained blast rather than a thump/crack. This envelope shapes each hit.
+_PERC_DECAY_SHAPE = 4.0     # exp decay reaches e^-4 (~1.8%) by the end of the hit
+_PERC_ATTACK_S = 0.002      # onset fade, kills the leading click
+_PERC_RELEASE_S = 0.004     # tail fade, kills the trailing click
+
+
+def _percussion_envelope(n: int, sr: int) -> np.ndarray:
+    """Amplitude envelope for one drum hit spanning `n` samples: exponential decay
+    (proportional to hit length, so `frames` controls decay time) plus short attack
+    and release fades that remove the rectangular-window clicks."""
+    if n <= 0:
+        return np.zeros(0, dtype=np.float64)
+    env = np.exp(-_PERC_DECAY_SHAPE * np.arange(n) / n)
+    a = min(max(1, int(_PERC_ATTACK_S * sr)), n)
+    env[:a] *= np.linspace(0.0, 1.0, a)
+    r = min(max(1, int(_PERC_RELEASE_S * sr)), n)
+    env[-r:] *= np.linspace(1.0, 0.0, r)
+    return env
 
 
 def render_channels(
@@ -98,17 +122,39 @@ def render_channels(
             _quantized_triangle_hz(ev.pitch), b - a, sr, phases[ChannelId.TRIANGLE])
         tri_buf[a:b] = wave * tri_level
 
+    # Render each drum hit as one contiguous, enveloped noise burst rather than a
+    # sequence of independent flat frames. A hit is a run of consecutive frames with
+    # the same percussion kind and volume; the whole run gets a single attack-decay
+    # envelope so it sounds percussive instead of like a gated blast of white noise.
     noise_buf = out[ChannelId.NOISE]
-    for f, ev in enumerate(timelines[ChannelId.NOISE].frames):
-        a, b = _frame_sample_bounds(f, sr, fr)
-        if b > total:
-            b = total
-        if a >= b or ev.percussion is None:
+    noise_frames = timelines[ChannelId.NOISE].frames
+    nf = len(noise_frames)
+    f = 0
+    while f < nf:
+        ev = noise_frames[f]
+        if ev.percussion is None:
+            f += 1
             continue
-        voice = cfg.drums[ev.percussion.value]
-        wave, noise_cursor = render_noise(
-            voice.period_index, voice.mode, b - a, sr, noise_cursor)
-        noise_buf[a:b] = wave * ev.volume
+        kind, vol = ev.percussion, ev.volume
+        start_f = f
+        f += 1
+        while f < nf and noise_frames[f].percussion is kind and noise_frames[f].volume == vol:
+            f += 1
+        a, _ = _frame_sample_bounds(start_f, sr, fr)
+        _, b = _frame_sample_bounds(f - 1, sr, fr)
+        b = min(b, total)
+        if a >= b:
+            continue
+        voice = cfg.drums[kind.value]
+        wave, noise_cursor = render_noise(voice.period_index, voice.mode, b - a, sr, noise_cursor)
+        noise_buf[a:b] = wave * vol * _percussion_envelope(b - a, sr)
+
+    # Low-pass the whole noise channel to tame the harsh, hissy top end of white noise.
+    # Real console output was filtered too; raw LFSR noise is brighter than a NES ever
+    # sounded. Zero-phase (filtfilt) so drum transients keep their timing.
+    if cfg.noise_lowpass_hz and 0 < cfg.noise_lowpass_hz < sr / 2 and noise_buf.any():
+        sos = butter(2, cfg.noise_lowpass_hz, btype="low", fs=sr, output="sos")
+        noise_buf[:] = sosfiltfilt(sos, noise_buf)
 
     # Per-channel trim from config, applied before the non-linear mixer.
     for ch in ChannelId:

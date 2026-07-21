@@ -23,6 +23,42 @@ def _fft_peak_hz(sig, sample_rate):
     return np.fft.rfftfreq(len(sig), 1 / sample_rate)[np.argmax(spec)]
 
 
+def test_percussion_hit_decays_and_has_soft_edges(cfg):
+    """A drum hit must be an attack-decay transient, not a flat gated noise burst:
+    it should decay over its length and fade in/out to avoid onset/offset clicks."""
+    s = Score(TempoGrid(120.0, 0.0, 4),
+              [NoteEvent(38, 0.0, 0.1, 120, Role.PERCUSSION, percussion=Percussion.SNARE)],
+              duration=1.0)
+    out = render(s, cfg)[ChannelId.NOISE]
+    nz = np.nonzero(np.abs(out) > 1e-6)[0]
+    assert len(nz) > 0, "the hit produced no sound"
+    region = out[nz[0]:nz[-1] + 1]
+    q = len(region) // 4
+    early = np.abs(region[:q]).max()
+    late = np.abs(region[-q:]).max()
+    assert late < 0.5 * early, f"hit did not decay (early {early:.3f} vs late {late:.3f}) - still a flat blast"
+    # soft edges: the very first and last samples are near-silent (fades kill clicks)
+    assert abs(region[0]) < 0.3 * early
+    assert abs(region[-1]) < 0.3 * early
+
+
+def test_noise_lowpass_reduces_high_frequency_energy(cfg):
+    """The noise low-pass must actually roll off the harsh top end of the drums."""
+    import dataclasses
+    s = Score(TempoGrid(120.0, 0.0, 4),
+              [NoteEvent(38, t / 10, t / 10 + 0.08, 120, Role.PERCUSSION, percussion=Percussion.SNARE)
+               for t in range(8)], duration=1.0)
+
+    def hi_frac(out):
+        spec = np.abs(np.fft.rfft(out)) ** 2
+        freqs = np.fft.rfftfreq(len(out), 1 / cfg.sample_rate)
+        return spec[freqs > 6000].sum() / max(spec.sum(), 1e-12)
+
+    filtered = render(s, cfg)[ChannelId.NOISE]
+    unfiltered = render(s, dataclasses.replace(cfg, noise_lowpass_hz=0.0))[ChannelId.NOISE]
+    assert hi_frac(filtered) < 0.5 * hi_frac(unfiltered), "low-pass did not reduce high-frequency energy"
+
+
 def test_all_channels_render_to_the_same_length(cfg):
     s = Score(TempoGrid(120.0, 0.0, 4),
               [NoteEvent(72, 0.0, 1.0, 100, Role.LEAD)], duration=1.0)

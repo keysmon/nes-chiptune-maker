@@ -140,6 +140,7 @@ class Config:
     triangle: ChannelConfig
     noise: ChannelConfig
     analysis: AnalysisConfig
+    noise_lowpass_hz: float = 0.0  # low-pass the noise channel to tame harsh/hissy drums; 0 = off
     drums: dict[str, DrumVoice] = field(default_factory=dict)
     levels: dict[str, float] = field(default_factory=dict)
 
@@ -196,6 +197,7 @@ def load_config(path: str | Path | None = None) -> Config:
         triangle=channel("triangle", ChannelConfig),
         noise=channel("noise", ChannelConfig),
         analysis=AnalysisConfig(**raw_analysis),
+        noise_lowpass_hz=raw.get("noise_lowpass_hz", 0.0),
         drums=drums,
         levels=raw_levels,
     )
