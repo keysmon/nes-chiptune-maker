@@ -35,7 +35,7 @@ from ..synth.mixer import apply_output_filter, nes_mix
 _ANALYSIS_ARRANGE_KEYS = frozenset({
     "harmony_mode", "chord_comp_pattern", "chord_subdivision", "chord_octave",
     "chord_tones", "chord_smooth_beats", "melody_min_seconds", "bass_min_seconds",
-    "harmony_rest_on_busy_melody",
+    "harmony_rest_on_busy_melody", "arrange_mode",
 })
 # [arrange] keys consumed only by quantize/allocate/synth (a change re-renders from
 # the cached Score). Kept explicit + partition-tested against ArrangeConfig so that

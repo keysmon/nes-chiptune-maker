@@ -40,6 +40,15 @@ VALID_ARRANGE_KEYS = frozenset({
     "melody_min_seconds",
     "bass_min_seconds",
     "harmony_rest_on_busy_melody",
+    "arrange_mode",
+})
+VALID_ARRANGE_MODES = frozenset({"heuristic", "ai"})
+VALID_AI_KEYS = frozenset({
+    "base_url",
+    "model",
+    "api_key_env",
+    "temperature",
+    "max_tokens",
 })
 VALID_ANALYSIS_KEYS = frozenset({
     "include_vocals",
@@ -107,6 +116,10 @@ class ArrangeConfig:
     melody_min_seconds: float
     bass_min_seconds: float
     harmony_rest_on_busy_melody: bool
+    # "heuristic" = existing rule-based arranger (unchanged default); "ai" = LLM
+    # arranger (chiptune.arrange.ai_arranger), Score-affecting so it forces a
+    # re-analyze - see web/runtime.py::_ANALYSIS_ARRANGE_KEYS.
+    arrange_mode: str = "heuristic"
 
     def __post_init__(self) -> None:
         if self.bass_low >= self.bass_high:
@@ -138,6 +151,10 @@ class ArrangeConfig:
             raise ValueError(f"melody_min_seconds must be >= 0, got {self.melody_min_seconds}")
         if self.bass_min_seconds < 0:
             raise ValueError(f"bass_min_seconds must be >= 0, got {self.bass_min_seconds}")
+        if self.arrange_mode not in VALID_ARRANGE_MODES:
+            raise ValueError(
+                f"arrange_mode {self.arrange_mode!r} must be one of {sorted(VALID_ARRANGE_MODES)}"
+            )
 
 
 @dataclass(frozen=True)
@@ -211,6 +228,23 @@ class AnalysisConfig:
 
 
 @dataclass(frozen=True)
+class AIConfig:
+    """LLM arranger connection + generation params (OpenAI-compatible endpoint;
+    Groq by default, but any compatible base_url/model works, e.g. local Ollama)."""
+    base_url: str
+    model: str
+    api_key_env: str  # name of the env var holding the API key, never the key itself
+    temperature: float
+    max_tokens: int
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.temperature <= 2.0:
+            raise ValueError(f"temperature must be in [0, 2], got {self.temperature}")
+        if self.max_tokens < 1:
+            raise ValueError(f"max_tokens must be >= 1, got {self.max_tokens}")
+
+
+@dataclass(frozen=True)
 class Config:
     sample_rate: int
     frame_rate: float
@@ -221,6 +255,7 @@ class Config:
     noise: ChannelConfig
     analysis: AnalysisConfig
     vibrato: VibratoConfig
+    ai: AIConfig
     noise_lowpass_hz: float = 0.0  # low-pass the noise channel to tame harsh/hissy drums; 0 = off
     output_highpass_hz: float = 0.0  # sub-sonic rumble cut on the final mix; 0 = off
     output_lowpass_hz: float = 0.0   # gentle top-end rolloff on the final mix; 0 = off
@@ -295,6 +330,16 @@ def config_from_dict(raw: dict, source: str = "config") -> Config:
     if "vibrato" not in raw:
         raise ValueError(f"config {path} is missing required [vibrato] section")
 
+    if "ai" not in raw:
+        raise ValueError(f"config {path} is missing required [ai] section")
+    raw_ai = raw["ai"]
+    bad_ai = set(raw_ai) - VALID_AI_KEYS
+    if bad_ai:
+        raise ValueError(
+            f"config {path} has unknown [ai] key {sorted(bad_ai)[0]!r}; "
+            f"ai must be one of {sorted(VALID_AI_KEYS)}"
+        )
+
     return Config(
         sample_rate=raw["sample_rate"],
         frame_rate=raw["frame_rate"],
@@ -305,6 +350,7 @@ def config_from_dict(raw: dict, source: str = "config") -> Config:
         noise=channel("noise", ChannelConfig),
         analysis=AnalysisConfig(**raw_analysis),
         vibrato=VibratoConfig(**raw["vibrato"]),
+        ai=AIConfig(**raw_ai),
         noise_lowpass_hz=raw.get("noise_lowpass_hz", 0.0),
         output_highpass_hz=raw.get("output_highpass_hz", 0.0),
         output_lowpass_hz=raw.get("output_lowpass_hz", 0.0),

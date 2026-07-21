@@ -37,6 +37,13 @@ VALID_VIBRATO = (
 )
 
 
+VALID_AI = (
+    "[ai]\nbase_url=\"https://api.groq.com/openai/v1\"\n"
+    "model=\"llama-3.3-70b-versatile\"\napi_key_env=\"GROQ_API_KEY\"\n"
+    "temperature=0.4\nmax_tokens=4000\n"
+)
+
+
 VALID_ARRANGE = (
     "[arrange]\nsubdivision=16\nquantize_strength=1.0\nmin_duration=0.03\n"
     "arpeggio_frames=2\nbass_low=28\nbass_high=55\nborrow_enabled=false\n"
@@ -59,6 +66,7 @@ def test_rejects_invalid_duty(tmp_path):
         f"[noise]\nduty=0.0\n{VALID_CHANNEL}"
         f"{VALID_ANALYSIS}"
         f"{VALID_VIBRATO}"
+        f"{VALID_AI}"
     )
     with pytest.raises(ValueError, match="duty"):
         load_config(bad)
@@ -183,9 +191,18 @@ def test_rejects_invalid_harmony_mode(tmp_path):
         f"[noise]\nduty=0.0\n{VALID_CHANNEL}"
         f"{VALID_ANALYSIS}"
         f"{VALID_VIBRATO}"
+        f"{VALID_AI}"
     )
     with pytest.raises(ValueError, match="harmony_mode"):
         load_config(bad)
+
+
+def test_ai_config_loads():
+    cfg = load_config()
+    assert cfg.arrange.arrange_mode in ("heuristic", "ai")
+    assert cfg.ai.model and cfg.ai.base_url.startswith("http")
+    assert cfg.ai.api_key_env == "GROQ_API_KEY"
+    assert 0.0 <= cfg.ai.temperature <= 2.0
 
 
 def test_vibrato_section_loads():
