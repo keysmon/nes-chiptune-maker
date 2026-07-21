@@ -74,3 +74,24 @@ def test_amplitude_stays_within_unit_range(bank):
     for duty in (0.125, 0.25, 0.5, 0.75):
         out, _ = bank.render(freq_hz=440.0, duty=duty, n_samples=4410, phase=0.0)
         assert np.abs(out).max() <= 1.0 + 1e-6
+
+
+def test_amplitude_is_consistent_across_octaves(bank):
+    """A fixed duty must sound equally loud in every octave. Each octave uses its
+    own band-limited table with a different harmonic count, so without per-table
+    normalization the peak drifts across octaves and collapses at the top, where
+    only one or two harmonics survive - an audible loudness jump whenever a melody
+    crosses an octave boundary. Narrow duty 0.125 is the stress case (~12 dB swing).
+
+    The probe MIDIs must span that swing to catch the defect: 48/72/96/120 land in
+    octave tables 3/5/7/9, and octave 9 is where the collapse begins. (The brief's
+    suggested 48/60/72 all sit in the flat mid-region - peaks 0.966/0.960/0.961 -
+    so that set passes even with the bug, and would not test anything.)
+    """
+    duty = 0.125
+    peaks = []
+    for midi in (48, 72, 96, 120):
+        freq = 440.0 * 2.0 ** ((midi - 69) / 12.0)
+        out, _ = bank.render(freq_hz=freq, duty=duty, n_samples=SR, phase=0.0)
+        peaks.append(float(np.abs(out).max()))
+    assert max(peaks) - min(peaks) < 0.02, f"octave peaks vary by too much: {peaks}"

@@ -79,3 +79,21 @@ def test_rejects_volume_above_four_bits(tmp_path):
     with pytest.raises(ValueError, match="0-15"):
         type(cfg.pulse1)(duty=0.5, volume=16, attack_frames=0,
                          decay_frames=0, sustain=1.0, release_frames=0)
+
+
+def test_drum_priority_loads_from_config():
+    """Collision priority is a taste value, so it comes from config, not code."""
+    drums = load_config().drums
+    assert drums["kick"].priority > drums["snare"].priority > drums["hat"].priority
+
+
+def test_drum_rejects_volume_above_four_bits():
+    from chiptune.config import DrumVoice
+    with pytest.raises(ValueError, match="0-15"):
+        DrumVoice(period_index=4, mode="long", volume=16, frames=4, priority=3)
+
+
+def test_drum_rejects_non_positive_frames():
+    from chiptune.config import DrumVoice
+    with pytest.raises(ValueError, match="frames"):
+        DrumVoice(period_index=4, mode="long", volume=10, frames=0, priority=3)

@@ -50,8 +50,16 @@ class PulseBank:
             amp = (2.0 / (n * np.pi)) * np.sin(n * np.pi * duty)
             table += amp * np.cos(2.0 * np.pi * n * t)
 
+        # Normalize EVERY table to a common reference peak of 1.0, not just those
+        # that overshoot it. Each octave keeps a different number of harmonics, so
+        # the raw peak drifts across octaves - and collapses at the top, where only
+        # one or two harmonics survive (e.g. duty 0.125 falls from ~0.96 to 0.24, a
+        # ~12 dB drop). Without this, a melody crossing an octave boundary jumps in
+        # loudness. Peak (not RMS) is the reference because RMS-normalizing the
+        # single-cosine top octave would push its peak to sqrt(2), breaking the
+        # unit-range guarantee the mixer's 0-15 DAC scaling depends on.
         peak = np.abs(table).max()
-        if peak > 1.0:
+        if peak > 0.0:
             table /= peak
 
         self._tables[key] = table

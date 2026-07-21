@@ -48,23 +48,28 @@ decay_frames = 2
 sustain = 0.0
 release_frames = 1
 
+# priority: when two hits land on the same frame the higher priority wins the one
+# noise channel. A lost kick is heard; a lost hi-hat is not - hence kick > snare > hat.
 [drums.kick]
 period_index = 10                 # index into the 16-entry NTSC noise period table
 mode = "long"
 volume = 13
 frames = 4
+priority = 3
 
 [drums.snare]
 period_index = 6
 mode = "long"
 volume = 12
 frames = 6
+priority = 2
 
 [drums.hat]
 period_index = 2
 mode = "long"
 volume = 6
 frames = 2
+priority = 1
 
 # Relative channel trim applied before the non-linear mixer.
 [levels]

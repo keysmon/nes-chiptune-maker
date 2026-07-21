@@ -1,7 +1,9 @@
 """Map drum hits onto the single noise channel.
 
 Only one hit can sound at a time. When hits collide, low-frequency hits carry
-the groove: a lost hi-hat is barely noticed, a lost kick is. Hence kick > snare > hat.
+the groove: a lost hi-hat is barely noticed, a lost kick is. Hence kick > snare >
+hat - but that ordering is a taste value, so it lives in config (each
+[drums.*].priority) rather than in a hardcoded table here.
 """
 from __future__ import annotations
 
@@ -10,12 +12,6 @@ import math
 from ..config import DrumVoice
 from ..score import NoteEvent, Percussion
 from .timeline import SILENT, FrameEvent
-
-PRIORITY: dict[Percussion, int] = {
-    Percussion.KICK: 3,
-    Percussion.SNARE: 2,
-    Percussion.HAT: 1,
-}
 
 
 def allocate_percussion(
@@ -41,7 +37,7 @@ def allocate_percussion(
             if not 0 <= f < n_frames:
                 continue
             existing = winners[f]
-            if existing is None or PRIORITY[note.percussion] > PRIORITY[existing]:
+            if existing is None or voice.priority > drums[existing.value].priority:
                 winners[f] = note.percussion
                 frames[f] = FrameEvent(
                     pitch=None, volume=voice.volume, percussion=note.percussion)

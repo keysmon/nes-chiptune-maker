@@ -69,12 +69,17 @@ class DrumVoice:
     mode: str
     volume: int
     frames: int
+    priority: int  # collision winner when two hits land on the same frame; higher wins
 
     def __post_init__(self) -> None:
         if not 0 <= self.period_index <= 15:
             raise ValueError(f"period_index must be 0-15, got {self.period_index}")
         if self.mode not in ("long", "short"):
             raise ValueError(f"mode must be 'long' or 'short', got {self.mode!r}")
+        if not 0 <= self.volume <= 15:
+            raise ValueError(f"volume must be 0-15 (4-bit DAC), got {self.volume}")
+        if self.frames < 1:
+            raise ValueError(f"frames must be >= 1, got {self.frames}")
 
 
 @dataclass(frozen=True)
@@ -101,7 +106,7 @@ def load_config(path: str | Path | None = None) -> Config:
     with path.open("rb") as fh:
         raw = tomllib.load(fh)
 
-    def channel(name: str, cls: type[_T] = ChannelConfig) -> _T:
+    def channel(name: str, cls: type[_T]) -> _T:
         if name not in raw:
             raise ValueError(f"config {path} is missing required [{name}] section")
         return cls(**raw[name])
@@ -129,8 +134,8 @@ def load_config(path: str | Path | None = None) -> Config:
         arrange=ArrangeConfig(**raw["arrange"]),
         pulse1=channel("pulse1", PulseConfig),
         pulse2=channel("pulse2", PulseConfig),
-        triangle=channel("triangle"),
-        noise=channel("noise"),
+        triangle=channel("triangle", ChannelConfig),
+        noise=channel("noise", ChannelConfig),
         drums=drums,
         levels=raw_levels,
     )
