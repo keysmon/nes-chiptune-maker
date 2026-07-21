@@ -130,6 +130,29 @@ def test_triangle_ignores_velocity(cfg):
     assert len(vols) == 1, "triangle volume must not vary with velocity (no hardware volume)"
 
 
+def test_reattack_gap_creates_a_silent_frame_between_repeated_lead_notes(cfg):
+    """Wiring check: allocate() must apply rearticulate() before reducing to frames."""
+    s = score_of([
+        NoteEvent(72, 0.0, 0.5, 100, Role.LEAD),
+        NoteEvent(72, 0.5, 1.0, 100, Role.LEAD),
+    ])
+    tl = allocate(s, cfg)[ChannelId.PULSE1]
+    assert tl.frames[28].pitch == 72
+    assert tl.frames[29].pitch is None, "a re-attack gap must silence a frame before the repeat"
+    assert tl.frames[30].pitch == 72
+
+
+def test_reattack_gap_applies_to_bass_too(cfg):
+    s = score_of([
+        NoteEvent(36, 0.0, 0.5, 100, Role.BASS),
+        NoteEvent(36, 0.5, 1.0, 100, Role.BASS),
+    ])
+    tl = allocate(s, cfg)[ChannelId.TRIANGLE]
+    assert tl.frames[28].pitch == 36
+    assert tl.frames[29].pitch is None, "bass re-attack must also get a silent gap frame"
+    assert tl.frames[30].pitch == 36
+
+
 def test_dropped_unplayable_note_warns_to_stderr(cfg, capsys):
     """Dropping is correct, but - like midi_io's percussion warning - not silent.
 

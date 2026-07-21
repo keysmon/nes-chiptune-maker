@@ -25,6 +25,7 @@ from ..nes.tables import playable_on_pulse, playable_on_triangle
 from ..score import NoteEvent, Role, Score
 from .arpeggio import arpeggiate
 from .percussion import allocate_percussion
+from .rearticulate import rearticulate
 from .timeline import SILENT, ChannelId, ChannelTimeline, FrameEvent
 
 
@@ -158,7 +159,11 @@ def allocate(score: Score, cfg: Config) -> dict[ChannelId, ChannelTimeline]:
     low, high = cfg.arrange.bass_low, cfg.arrange.bass_high
 
     # --- Pulse 1: lead, highest wins ---
-    lead_notes = score.notes_with_role(Role.LEAD)
+    # Re-articulate before reduction: a repeated same-pitch note otherwise fuses
+    # with the one before it in the per-frame pitch model (see rearticulate.py).
+    # Harmony is skipped - arpeggiation already re-strikes every chord tone.
+    lead_notes = rearticulate(
+        score.notes_with_role(Role.LEAD), cfg.arrange.reattack_gap, cfg.arrange.min_duration)
     lead = [nt for nt in lead_notes if playable_on_pulse(nt.pitch)]
     dropped_lead = [nt.pitch for nt in lead_notes if not playable_on_pulse(nt.pitch)]
     lead_winners = _monophonic(lead, n, fr, pick_highest=True)
@@ -169,7 +174,8 @@ def allocate(score: Score, cfg: Config) -> dict[ChannelId, ChannelTimeline]:
         velocity_floor=cfg.arrange.velocity_floor, velocities=lead_velocities)
 
     # --- Triangle: bass, lowest wins, folded into range ---
-    bass_notes = score.notes_with_role(Role.BASS)
+    bass_notes = rearticulate(
+        score.notes_with_role(Role.BASS), cfg.arrange.reattack_gap, cfg.arrange.min_duration)
     # Counted per note (like lead/harmony) rather than per reduced frame; folding
     # normally lands every bass pitch in a playable range, so this is a safety net.
     dropped_bass = [nt.pitch for nt in bass_notes

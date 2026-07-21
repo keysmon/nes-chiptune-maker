@@ -39,6 +39,7 @@ def test_rejects_invalid_duty(tmp_path):
         "[arrange]\nsubdivision=16\nquantize_strength=1.0\nmin_duration=0.03\n"
         "arpeggio_frames=2\nbass_low=28\nbass_high=55\nborrow_enabled=false\n"
         "borrow_idle_frames=30\nborrow_hysteresis_frames=15\nvelocity_floor=0.35\n"
+        "reattack_gap=0.02\n"
         f"[pulse1]\nduty=0.33\n{VALID_CHANNEL}"
         f"[pulse2]\nduty=0.25\n{VALID_CHANNEL}"
         f"[triangle]\nduty=0.0\n{VALID_CHANNEL}"

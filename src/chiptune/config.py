@@ -69,6 +69,7 @@ class ArrangeConfig:
     borrow_idle_frames: int
     borrow_hysteresis_frames: int
     velocity_floor: float
+    reattack_gap: float
 
     def __post_init__(self) -> None:
         if self.bass_low >= self.bass_high:
@@ -77,6 +78,8 @@ class ArrangeConfig:
             raise ValueError(f"arpeggio_frames must be >= 1, got {self.arpeggio_frames}")
         if not 0.0 <= self.velocity_floor <= 1.0:
             raise ValueError(f"velocity_floor must be in [0, 1], got {self.velocity_floor}")
+        if self.reattack_gap < 0:
+            raise ValueError(f"reattack_gap must be >= 0, got {self.reattack_gap}")
 
 
 @dataclass(frozen=True)
