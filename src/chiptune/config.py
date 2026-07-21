@@ -126,8 +126,8 @@ class ArrangeConfig:
                 f"chord_comp_pattern {self.chord_comp_pattern!r} must be one of "
                 f"{sorted(VALID_CHORD_COMP_PATTERNS)}"
             )
-        if self.chord_subdivision < 1:
-            raise ValueError(f"chord_subdivision must be >= 1, got {self.chord_subdivision}")
+        if not 1 <= self.chord_subdivision <= 16:
+            raise ValueError(f"chord_subdivision must be 1-16, got {self.chord_subdivision}")
         if self.chord_tones < 1:
             raise ValueError(f"chord_tones must be >= 1, got {self.chord_tones}")
         if not 0 <= self.chord_octave <= 8:

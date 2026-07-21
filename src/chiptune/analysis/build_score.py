@@ -46,7 +46,7 @@ from chiptune.analysis.tempo import estimate_grid
 from chiptune.analysis.transcribe import transcribe_pitched
 from chiptune.analysis.vocals import transcribe_vocals
 from chiptune.arrange.chord_comp import comp_chords
-from chiptune.arrange.sparse import simplify_bass, thin_melody
+from chiptune.arrange.sparse import rest_harmony_on_busy_melody, simplify_bass, thin_melody
 from chiptune.config import Config
 from chiptune.score import NoteEvent, Role, Score
 
@@ -156,6 +156,8 @@ def build_score(audio_path, cfg: Config, cache_dir=None) -> Score:
 
     lead = thin_melody(lead, arr.melody_min_seconds)
     bass = simplify_bass(bass, arr.bass_min_seconds)
+    if arr.harmony_rest_on_busy_melody:
+        harmony = rest_harmony_on_busy_melody(harmony, lead)
 
     notes = lead + harmony + bass + drums
     declash_pushed = 0

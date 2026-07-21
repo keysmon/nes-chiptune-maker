@@ -31,7 +31,7 @@ chord_tones                  = 3         # chord tones per comp cycle (root/thir
 chord_smooth_beats           = 2         # mode-smoothing window (beats) for chord detection
 melody_min_seconds           = 0.08      # drop LEAD notes shorter than this (thin_melody)
 bass_min_seconds             = 0.08      # drop BASS notes shorter than this (simplify_bass)
-harmony_rest_on_busy_melody  = false     # reserved; not yet wired to any behavior
+harmony_rest_on_busy_melody  = false     # drop harmony notes that land on a melodic attack, giving the melody space
 
 # duty: 0.125 / 0.25 / 0.5 / 0.75 are the only values the real chip supports
 [pulse1]                          # lead
