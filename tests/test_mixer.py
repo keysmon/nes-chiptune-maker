@@ -31,6 +31,33 @@ def test_louder_input_gives_louder_output():
     assert loud > quiet
 
 
+def test_symmetric_input_stays_zero_mean():
+    """A zero-mean bipolar channel must stay zero-mean through the mixer.
+
+    Our oscillators emit zero-mean band-limited waveforms. Half-wave rectifying
+    one (clamping its negative half to 0) injects a positive DC offset and a
+    buzzy octave-up artifact - worst on the triangle bass channel. The mixer's
+    compression curve must be applied odd-symmetrically so a symmetric input
+    produces a symmetric output.
+    """
+    tri = np.array([1.0, -1.0] * 50)
+    z = np.zeros_like(tri)
+    out = nes_mix(z, z, tri, z)
+    assert abs(out.mean()) < 1e-9
+
+
+def test_mixer_is_odd_symmetric():
+    """nes_mix(-x) must equal -nes_mix(x): the DAC curve applies to both polarities."""
+    rng = np.random.default_rng(0)
+    p1 = rng.uniform(-7.0, 7.0, 100)
+    p2 = rng.uniform(-7.0, 7.0, 100)
+    tri = rng.uniform(-8.0, 8.0, 100)
+    noise = rng.uniform(-1.0, 1.0, 100)
+    pos = nes_mix(p1, p2, tri, noise)
+    neg = nes_mix(-p1, -p2, -tri, -noise)
+    np.testing.assert_allclose(neg, -pos, atol=1e-12)
+
+
 def test_length_mismatch_is_an_error():
     with pytest.raises(ValueError, match="same length"):
         nes_mix(const(1, 100), const(1, 50), const(1, 100), const(1, 100))
