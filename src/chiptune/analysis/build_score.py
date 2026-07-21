@@ -98,6 +98,25 @@ def declash_harmony(notes: list[NoteEvent], declash_semitones: int) -> list[Note
     return out
 
 
+def _log_score_stats(label: str, score: Score, frame_rate: float) -> None:
+    """Log one arrangement's role counts + density, tagged by mode. In "ai" mode
+    the returned notes differ from the heuristic source, so this is called for
+    BOTH ([heuristic] source/fallback and [ai] returned) - the log always
+    describes the score the reader means, never a stale stand-in."""
+    counts = {r: sum(1 for n in score.notes if n.role is r) for r in Role}
+    density = score_density(score, frame_rate=frame_rate)
+    print(
+        f"chiptune.analysis.build_score[{label}]: "
+        f"lead={counts[Role.LEAD]} harmony={counts[Role.HARMONY]} "
+        f"bass={counts[Role.BASS]} percussion={counts[Role.PERCUSSION]}; "
+        f"density mean_simultaneous={density['mean_simultaneous']:.2f} "
+        f"lead_active={density['per_role_active'][Role.LEAD]:.2f} "
+        f"harmony_active={density['per_role_active'][Role.HARMONY]:.2f} "
+        f"bass_active={density['per_role_active'][Role.BASS]:.2f}",
+        file=sys.stderr,
+    )
+
+
 def build_score(audio_path, cfg: Config, cache_dir=None) -> Score:
     """Separate `audio_path`, transcribe/arrange each role, apply config-gated
     harmony declash, estimate tempo from the original mix, and assemble one Score.
@@ -172,27 +191,19 @@ def build_score(audio_path, cfg: Config, cache_dir=None) -> Score:
     duration = max((n.end for n in notes), default=0.0)
     heuristic_score = Score(tempo=grid, notes=notes, duration=duration)
 
-    counts = {r: sum(1 for n in notes if n.role is r) for r in Role}
     print(
         f"chiptune.analysis.build_score: {grid.bpm:.1f} BPM; harmony_mode={arr.harmony_mode}; "
-        f"lead={counts[Role.LEAD]} harmony={counts[Role.HARMONY]} "
-        f"bass={counts[Role.BASS]} percussion={counts[Role.PERCUSSION]} "
         f"declash_pushed={declash_pushed}",
         file=sys.stderr,
     )
-    density = score_density(heuristic_score, frame_rate=cfg.frame_rate)
-    print(
-        f"chiptune.analysis.build_score: density mean_simultaneous="
-        f"{density['mean_simultaneous']:.2f} lead_active={density['per_role_active'][Role.LEAD]:.2f} "
-        f"harmony_active={density['per_role_active'][Role.HARMONY]:.2f} "
-        f"bass_active={density['per_role_active'][Role.BASS]:.2f}",
-        file=sys.stderr,
-    )
+    _log_score_stats("heuristic", heuristic_score, cfg.frame_rate)
 
     # "ai" = hand the heuristic Score (melody/tempo source AND fallback) to the
     # LLM arranger; "heuristic" (default) leaves existing behavior unchanged.
     if arr.arrange_mode == "ai":
         from chiptune.arrange.ai_arranger import arrange as ai_arrange
 
-        return ai_arrange(heuristic_score, cfg.ai, None, lambda: heuristic_score)
+        ai_score = ai_arrange(heuristic_score, cfg.ai, None, lambda: heuristic_score)
+        _log_score_stats("ai", ai_score, cfg.frame_rate)
+        return ai_score
     return heuristic_score

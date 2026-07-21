@@ -1,4 +1,3 @@
-import pytest
 from chiptune.score import NoteEvent, Role, Score, TempoGrid
 from chiptune.config import load_config
 from chiptune.arrange import ai_arranger
@@ -17,7 +16,9 @@ def test_arrange_parses_llm_output_into_a_score(monkeypatch):
     out = ai_arranger.arrange(_score(), cfg.ai, {"LEAD":4,"HARM":3,"BASS":2}, _heuristic)
     roles = {n.role for n in out.notes}
     assert Role.LEAD in roles and Role.BASS in roles and Role.PERCUSSION in roles
-    assert out is not _heuristic()  # used the LLM, not the fallback
+    # The LLM path was taken, not the fallback: "LEAD: 2" is D4 (62) in C major
+    # oct 4, a pitch the heuristic fallback (its only note is 60) never emits.
+    assert 62 in {n.pitch for n in out.notes}
 
 def test_arrange_falls_back_on_llm_error(monkeypatch):
     def boom(prompt, cfg): raise RuntimeError("api down")
@@ -32,6 +33,6 @@ def test_arrange_falls_back_on_unparseable_output(monkeypatch):
     out = ai_arranger.arrange(_score(), cfg.ai, {"LEAD":4,"HARM":3,"BASS":2}, _heuristic)
     assert [n.pitch for n in out.notes] == [60]
 
-def test_format_prompt_includes_the_melody(monkeypatch):
+def test_format_prompt_includes_the_melody():
     p = ai_arranger.format_prompt(_score())
     assert "MELODY" in p.upper() and "120" in p  # tempo present
