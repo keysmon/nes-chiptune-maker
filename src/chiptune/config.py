@@ -16,6 +16,19 @@ DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "nes.toml
 VALID_DUTIES = (0.125, 0.25, 0.5, 0.75)
 VALID_DRUM_KEYS = frozenset({"kick", "snare", "hat"})
 VALID_LEVEL_KEYS = frozenset({"pulse1", "pulse2", "triangle", "noise"})
+VALID_ANALYSIS_KEYS = frozenset({
+    "include_vocals",
+    "vocal_fmin",
+    "vocal_fmax",
+    "min_note_seconds",
+    "kick_band_hz",
+    "hat_band_hz",
+    "kick_low_frac_min",
+    "hat_high_frac_min",
+    "onset_backtrack",
+    "harmony_declash",
+    "declash_semitones",
+})
 
 
 @dataclass(frozen=True)
@@ -83,6 +96,41 @@ class DrumVoice:
 
 
 @dataclass(frozen=True)
+class AnalysisConfig:
+    include_vocals: bool
+    vocal_fmin: float
+    vocal_fmax: float
+    min_note_seconds: float
+    kick_band_hz: float
+    hat_band_hz: float
+    kick_low_frac_min: float
+    hat_high_frac_min: float
+    onset_backtrack: bool
+    harmony_declash: bool
+    declash_semitones: int
+
+    def __post_init__(self) -> None:
+        if self.vocal_fmin >= self.vocal_fmax:
+            raise ValueError(
+                f"vocal_fmin {self.vocal_fmin} must be below vocal_fmax {self.vocal_fmax}"
+            )
+        if self.kick_band_hz >= self.hat_band_hz:
+            raise ValueError(
+                f"kick_band_hz {self.kick_band_hz} must be below hat_band_hz {self.hat_band_hz}"
+            )
+        if not 0 < self.kick_low_frac_min <= 1:
+            raise ValueError(
+                f"kick_low_frac_min must be in (0, 1], got {self.kick_low_frac_min}"
+            )
+        if not 0 < self.hat_high_frac_min <= 1:
+            raise ValueError(
+                f"hat_high_frac_min must be in (0, 1], got {self.hat_high_frac_min}"
+            )
+        if self.min_note_seconds <= 0:
+            raise ValueError(f"min_note_seconds must be positive, got {self.min_note_seconds}")
+
+
+@dataclass(frozen=True)
 class Config:
     sample_rate: int
     frame_rate: float
@@ -91,6 +139,7 @@ class Config:
     pulse2: PulseConfig
     triangle: ChannelConfig
     noise: ChannelConfig
+    analysis: AnalysisConfig
     drums: dict[str, DrumVoice] = field(default_factory=dict)
     levels: dict[str, float] = field(default_factory=dict)
 
@@ -128,6 +177,16 @@ def load_config(path: str | Path | None = None) -> Config:
             f"levels must be one of {sorted(VALID_LEVEL_KEYS)}"
         )
 
+    if "analysis" not in raw:
+        raise ValueError(f"config {path} is missing required [analysis] section")
+    raw_analysis = raw["analysis"]
+    bad_analysis = set(raw_analysis) - VALID_ANALYSIS_KEYS
+    if bad_analysis:
+        raise ValueError(
+            f"config {path} has unknown [analysis] key {sorted(bad_analysis)[0]!r}; "
+            f"analysis must be one of {sorted(VALID_ANALYSIS_KEYS)}"
+        )
+
     return Config(
         sample_rate=raw["sample_rate"],
         frame_rate=raw["frame_rate"],
@@ -136,6 +195,7 @@ def load_config(path: str | Path | None = None) -> Config:
         pulse2=channel("pulse2", PulseConfig),
         triangle=channel("triangle", ChannelConfig),
         noise=channel("noise", ChannelConfig),
+        analysis=AnalysisConfig(**raw_analysis),
         drums=drums,
         levels=raw_levels,
     )
