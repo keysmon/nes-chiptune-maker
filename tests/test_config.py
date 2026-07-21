@@ -97,3 +97,12 @@ def test_drum_rejects_non_positive_frames():
     from chiptune.config import DrumVoice
     with pytest.raises(ValueError, match="frames"):
         DrumVoice(period_index=4, mode="long", volume=10, frames=0, priority=3)
+
+
+def test_analysis_section_loads():
+    cfg = load_config()
+    assert cfg.analysis.include_vocals is True
+    assert cfg.analysis.vocal_fmin < cfg.analysis.vocal_fmax
+    assert cfg.analysis.kick_max_hz < cfg.analysis.hat_min_hz
+    assert cfg.analysis.min_note_seconds > 0
+    assert cfg.analysis.harmony_declash is True

@@ -77,3 +77,16 @@ pulse1 = 1.0
 pulse2 = 0.85
 triangle = 1.0
 noise = 0.7
+
+# Audio -> Score analysis taste knobs (Demucs separation, transcription, drum
+# classification). Nothing tasteful is hardcoded in Python here either.
+[analysis]
+include_vocals   = true    # false -> instrumental cover, lead taken from `other`
+vocal_fmin       = 80.0    # librosa.pyin search floor (Hz)
+vocal_fmax       = 1000.0
+min_note_seconds = 0.033   # drop transcribed notes shorter than this (seconds)
+kick_max_hz      = 150.0   # spectral centroid below this -> kick
+hat_min_hz       = 6000.0  # spectral centroid above this -> hat; between -> snare
+onset_backtrack  = true    # librosa onset backtracking to the local energy minimum
+harmony_declash  = true    # push a harmony note down an octave when it collides with the lead
+declash_semitones = 1      # "collides" = within this many semitones of a concurrent lead note
