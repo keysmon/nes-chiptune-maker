@@ -53,7 +53,16 @@ def check_invariants(
                     f"{ch.value} frame {i} carries both a pitch and a percussion hit"
                 )
 
-    # 4. No clipping.
+    # 4. No NaN or inf. A NaN slips through both np.clip (which propagates it) and
+    #    the `nan > 1.0` clip comparison (which is False), so it must be caught here
+    #    before the clip check - otherwise a numerically-broken render reaches the WAV.
+    if samples.size and not np.all(np.isfinite(samples)):
+        raise InvariantViolation(
+            "output is not finite: contains NaN or inf samples"
+        )
+
+    # 5. No clipping. This now runs on the raw pre-clamp mix (see mixer.nes_mix), so a
+    #    genuine clip fails the build loudly instead of being silently distorted.
     if samples.size and float(np.abs(samples).max()) > 1.0:
         raise InvariantViolation(
             f"output clips: peak {float(np.abs(samples).max()):.4f} exceeds 1.0"

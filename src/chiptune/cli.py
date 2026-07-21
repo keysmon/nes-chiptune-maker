@@ -11,6 +11,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import numpy as np
+
 from .arrange.allocator import allocate
 from .arrange.timeline import ChannelId
 from .config import load_config
@@ -33,16 +35,19 @@ def render_score(score: Score, config_path=None, out_path="out/chiptune.wav") ->
     )
     timelines = allocate(quantized, cfg)
     channels = render_channels(timelines, cfg)
-    mixed = nes_mix(
+    raw_mix = nes_mix(
         channels[ChannelId.PULSE1],
         channels[ChannelId.PULSE2],
         channels[ChannelId.TRIANGLE],
         channels[ChannelId.NOISE],
     )
-    check_invariants(timelines, mixed)
+    # Validate the RAW mix so a genuine clip or NaN fails the build loudly; only
+    # then clamp for output, guarding float-epsilon overshoot on a checked signal.
+    check_invariants(timelines, raw_mix)
+    wav = np.clip(raw_mix, -1.0, 1.0)
 
     out = Path(out_path)
-    write_wav(out, mixed, cfg.sample_rate)
+    write_wav(out, wav, cfg.sample_rate)
     return out
 
 

@@ -55,6 +55,15 @@ def nes_mix(
     triangle: np.ndarray,
     noise: np.ndarray,
 ) -> np.ndarray:
+    """Mix the four channels through the NES non-linear DAC and return the RAW signal.
+
+    Deliberately does NOT clamp. The spec-6.1 "no clipping" invariant is only
+    meaningful on the un-clamped signal, so returning the raw mix lets
+    ``invariants.check_invariants`` actually see - and fail on - a genuine clip
+    instead of a value the mixer silently distorted to fit [-1, 1]. The clamp to
+    [-1, 1] happens once, at WAV-write time in the CLI, guarding only
+    float-epsilon overshoot on an already-validated signal.
+    """
     lengths = {len(pulse1), len(pulse2), len(triangle), len(noise)}
     if len(lengths) != 1:
         raise ValueError(f"all channels must be the same length, got {sorted(lengths)}")
@@ -62,8 +71,7 @@ def nes_mix(
     pulse_out = _compress(pulse1 + pulse2, 95.88, 8128.0)
     tnd_out = _compress(triangle / 8227.0 + noise / 12241.0, 159.79, 1.0)  # dmc / 22638 == 0
 
-    out = pulse_out + tnd_out
-    return np.clip(out, -1.0, 1.0)
+    return pulse_out + tnd_out
 
 
 def write_wav(path: str | Path, samples: np.ndarray, sample_rate: int) -> None:

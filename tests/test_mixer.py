@@ -21,6 +21,9 @@ def test_mixing_is_non_linear_not_additive():
 
 
 def test_output_never_clips():
+    """nes_mix returns the RAW (un-clamped) mix, so this asserts the compression
+    curve alone keeps four channels at full tilt under 1.0 - the headroom that lets
+    the CLI's no-clipping invariant pass without the mixer ever distorting."""
     out = nes_mix(const(15), const(15), const(15), const(15))
     assert np.abs(out).max() <= 1.0
 

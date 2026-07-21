@@ -35,6 +35,13 @@ def test_clipping_is_a_violation():
         check_invariants(timelines(), np.array([0.0, 1.5, 0.0]))
 
 
+def test_nan_sample_is_a_violation():
+    """A NaN slips through both np.clip and the `nan > 1.0` clip comparison, so it
+    must be caught explicitly - otherwise it reaches the WAV as silence-or-garbage."""
+    with pytest.raises(InvariantViolation, match="finite"):
+        check_invariants(timelines(), np.array([0.0, np.nan, 0.0]))
+
+
 def test_volume_above_four_bits_is_rejected_at_construction():
     with pytest.raises(ValueError, match="0-15"):
         FrameEvent(pitch=60, volume=99)
