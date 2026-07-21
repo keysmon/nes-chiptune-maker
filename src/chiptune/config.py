@@ -235,14 +235,26 @@ def load_config(path: str | Path | None = None) -> Config:
     path = Path(path) if path is not None else DEFAULT_CONFIG_PATH
     if not path.exists():
         raise FileNotFoundError(f"config not found: {path}")
-
     with path.open("rb") as fh:
         raw = tomllib.load(fh)
+    return config_from_dict(raw, source=str(path))
 
+
+def default_raw_config() -> dict:
+    """The default config as a plain nested dict (parsed from nes.toml). The web
+    runtime deep-merges user overrides onto this before building a Config."""
+    with DEFAULT_CONFIG_PATH.open("rb") as fh:
+        return tomllib.load(fh)
+
+
+def config_from_dict(raw: dict, source: str = "config") -> Config:
+    """Build (and validate) a Config from a raw nested dict. Shared by load_config
+    (file) and the web runtime (defaults + JSON overrides)."""
     def channel(name: str, cls: type[_T]) -> _T:
         if name not in raw:
-            raise ValueError(f"config {path} is missing required [{name}] section")
+            raise ValueError(f"config {source} is missing required [{name}] section")
         return cls(**raw[name])
+    path = source  # keep the existing error messages below unchanged
 
     raw_drums = raw.get("drums", {})
     bad_drums = set(raw_drums) - VALID_DRUM_KEYS
@@ -299,3 +311,24 @@ def load_config(path: str | Path | None = None) -> Config:
         drums=drums,
         levels=raw_levels,
     )
+
+
+def _deep_merge(base: dict, overrides: dict) -> dict:
+    """Recursively merge `overrides` onto a copy of `base` (nested dicts merge;
+    scalars replace). Used to layer web-UI overrides onto the default config."""
+    out = {k: (dict(v) if isinstance(v, dict) else v) for k, v in base.items()}
+    for k, v in overrides.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def config_from_overrides(overrides: dict | None) -> Config:
+    """Build a validated Config from the default nes.toml deep-merged with a nested
+    `overrides` dict (e.g. {"levels": {"noise": 0.5}, "vibrato": {"depth_semitones": 0.5}}).
+    Invalid values raise ValueError via the dataclass validators - the web API turns
+    that into a 400. This is the single entry point for runtime (web) configuration."""
+    merged = _deep_merge(default_raw_config(), overrides or {})
+    return config_from_dict(merged, source="overrides")

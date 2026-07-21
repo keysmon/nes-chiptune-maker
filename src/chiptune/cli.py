@@ -24,8 +24,9 @@ from .synth.apu import render_channels
 from .synth.mixer import apply_output_filter, nes_mix, write_wav
 
 
-def render_score(score: Score, config_path=None, out_path="out/chiptune.wav") -> Path:
-    cfg = load_config(config_path)
+def render_score(score: Score, config_path=None, out_path="out/chiptune.wav", cfg=None) -> Path:
+    if cfg is None:
+        cfg = load_config(config_path)
 
     quantized = quantize_score(
         score,

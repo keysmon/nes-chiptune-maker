@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang=en>
+<head>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Chiptune Maker</title>
+<style>
+:root{--bg:#0d0f1a;--panel:#161a2b;--panel2:#1d2233;--fg:#e8e8f0;--mut:#8a90b0;
+--grid:#2a2d42;--accent:#39ff9e;--accent2:#5a83e0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+font-family:ui-monospace,'DejaVu Sans Mono',Menlo,monospace;padding:22px;line-height:1.5}
+h1{font-size:20px;margin:0} .tag{color:var(--accent)}
+.sub{color:var(--mut);font-size:13px;margin:2px 0 18px}
+.wrap{display:grid;grid-template-columns:1fr 380px;gap:18px;align-items:start}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+.card h2{font-size:13px;margin:0 0 12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+#drop{border:2px dashed var(--grid);border-radius:12px;padding:34px;text-align:center;color:var(--mut);cursor:pointer;transition:.15s}
+#drop:hover,#drop.hot{border-color:var(--accent);color:var(--fg);background:#141a2c}
+button{background:#232840;color:var(--fg);border:1px solid var(--grid);border-radius:8px;padding:10px 16px;font:inherit;cursor:pointer}
+button.primary{background:#2f8f5b;border-color:#3fae70;font-weight:600}
+button:disabled{opacity:.5;cursor:not-allowed}
+audio{width:100%;margin-top:8px;filter:invert(.9) hue-rotate(180deg)}
+.player-label{font-size:12px;color:var(--mut);margin-top:10px}
+.player-label.chip{color:var(--accent)}
+.ctrl{margin-bottom:11px}
+.ctrl .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ctrl label{font-size:12.5px}
+.ctrl .val{font-variant-numeric:tabular-nums;color:var(--mut);font-size:12px;min-width:52px;text-align:right}
+input[type=range]{width:100%;accent-color:var(--accent2);margin-top:3px}
+select{width:100%;background:var(--panel2);color:var(--fg);border:1px solid var(--grid);border-radius:6px;padding:6px;font:inherit;margin-top:3px}
+input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+.badge{display:inline-block;font-size:10px;color:#111;background:var(--accent2);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle}
+.badge.slow{background:#e6b04a}
+.stats{font-size:12px;color:var(--mut);display:flex;flex-wrap:wrap;gap:6px 16px}
+.stats b{color:var(--fg);font-weight:600}
+#status{font-size:13px;color:var(--mut);min-height:20px;margin-top:8px}
+#status .spin{color:var(--accent)}
+.hint{color:var(--mut);font-size:11px;margin-top:2px}
+.hidden{display:none}
+.groupname{color:var(--accent2);font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;border-top:1px solid var(--grid);padding-top:12px}
+.groupname:first-child{border-top:none;margin-top:0}
+</style>
+</head>
+<body>
+<h1>Chiptune <span class=tag>Maker</span></h1>
+<div class=sub>Upload a song. It gets separated, transcribed, and re-arranged for the NES 2A03's four voices. Then tune it live.</div>
+
+<div class=wrap>
+  <div class=left>
+    <div class=card id=uploadCard>
+      <h2>1 · Upload a song</h2>
+      <div id=drop>Drop an audio file here, or click to choose<br><span class=hint>wav / mp3 / flac · up to 25 MB · a 20-40 s clip works best</span></div>
+      <input id=file type=file accept="audio/*" class=hidden>
+      <div id=status></div>
+    </div>
+
+    <div class="card hidden" id=playCard>
+      <h2>2 · Listen</h2>
+      <div class=player-label>Original</div>
+      <audio id=origAudio controls></audio>
+      <div class="player-label chip">Chiptune</div>
+      <audio id=chipAudio controls></audio>
+      <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+        <a id=dl><button id=dlBtn disabled>Download .wav</button></a>
+        <button id=reset>New song</button>
+      </div>
+      <div class=stats id=stats style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <div class="card hidden" id=controlsCard>
+    <h2>3 · Customize</h2>
+    <div id=controls></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let SESSION = null, SCHEMA = [], values = {}, renderTimer = null, rendering = false, queued = false;
+
+const drop = $('#drop'), fileInput = $('#file');
+drop.onclick = () => fileInput.click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('hot'); };
+drop.ondragleave = () => drop.classList.remove('hot');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('hot'); if(e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); };
+fileInput.onchange = () => { if(fileInput.files[0]) upload(fileInput.files[0]); };
+
+function status(msg, spinning){ $('#status').innerHTML = spinning ? `<span class=spin>${msg}</span>` : msg; }
+
+async function upload(f){
+  status('Uploading ' + f.name + ' ...', true);
+  const fd = new FormData(); fd.append('file', f);
+  let r;
+  try { r = await fetch('/api/upload', {method:'POST', body:fd}); }
+  catch(e){ status('Upload failed: ' + e); return; }
+  if(!r.ok){ status('Upload rejected: ' + (await r.text())); return; }
+  const j = await r.json();
+  SESSION = j.session_id;
+  $('#origAudio').src = j.original_url;
+  $('#playCard').classList.remove('hidden');
+  $('#controlsCard').classList.remove('hidden');
+  if(!SCHEMA.length) await loadSchema();
+  status('Separating stems, transcribing, detecting chords - first convert takes ~20-40 s ...', true);
+  render(true);
+}
+
+async function loadSchema(){
+  const j = await (await fetch('/api/schema')).json();
+  SCHEMA = j.controls;
+  const host = $('#controls'); host.innerHTML = '';
+  let lastGroup = null;
+  for(const c of SCHEMA){
+    values[c.path] = c.default;
+    if(c.group !== lastGroup){ lastGroup = c.group;
+      const g = document.createElement('div'); g.className='groupname'; g.textContent=c.group; host.appendChild(g); }
+    host.appendChild(controlEl(c));
+  }
+}
+
+function controlEl(c){
+  const el = document.createElement('div'); el.className='ctrl';
+  const badge = c.analysis ? '<span class="badge slow" title="changing this re-analyzes (slower)">re-analyzes</span>' : '';
+  if(c.type === 'toggle'){
+    el.innerHTML = `<div class=row><label>${c.label}${badge}</label>
+      <input type=checkbox ${c.default?'checked':''}></div>` + (c.help?`<div class=hint>${c.help}</div>`:'');
+    el.querySelector('input').onchange = e => { values[c.path]=e.target.checked; scheduleRender(); };
+  } else if(c.type === 'choice'){
+    el.innerHTML = `<div class=row><label>${c.label}${badge}</label></div>
+      <select>${c.options.map(o=>`<option ${o===c.default?'selected':''}>${o}</option>`).join('')}</select>`
+      + (c.help?`<div class=hint>${c.help}</div>`:'');
+    el.querySelector('select').onchange = e => { values[c.path]=e.target.value; scheduleRender(); };
+  } else {
+    const step = c.step || 1;
+    el.innerHTML = `<div class=row><label>${c.label}${badge}</label><span class=val>${c.default}</span></div>
+      <input type=range min=${c.min} max=${c.max} step=${step} value=${c.default}>`
+      + (c.help?`<div class=hint>${c.help}</div>`:'');
+    const val = el.querySelector('.val');
+    el.querySelector('input').oninput = e => { const v = parseFloat(e.target.value); values[c.path]=v; val.textContent=v; };
+    el.querySelector('input').onchange = () => scheduleRender();
+  }
+  return el;
+}
+
+function scheduleRender(){ clearTimeout(renderTimer); renderTimer = setTimeout(()=>render(false), 250); }
+
+async function render(initial){
+  if(!SESSION) return;
+  if(rendering){ queued = true; return; }
+  rendering = true;
+  status(initial ? 'Converting (first time is slow) ...' : 'Rendering ...', true);
+  let r;
+  try { r = await fetch('/api/render', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({session_id: SESSION, overrides: values})}); }
+  catch(e){ status('Render failed: ' + e); rendering=false; return; }
+  if(!r.ok){ status('Render error: ' + (await r.text())); rendering=false; return; }
+  const stats = JSON.parse(r.headers.get('X-Chiptune-Stats') || '{}');
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const chip = $('#chipAudio'); const wasPlaying = !chip.paused;
+  chip.src = url;
+  $('#dl').href = url; $('#dl').download = 'chiptune.wav'; $('#dlBtn').disabled = false;
+  showStats(stats);
+  status('Ready.' + (stats.reanalyzed ? ' (re-analyzed)' : ''));
+  rendering = false;
+  if(queued){ queued = false; scheduleRender(); }
+}
+
+function showStats(s){
+  if(!s.bpm){ $('#stats').innerHTML=''; return; }
+  const roles = s.notes_by_role || {};
+  $('#stats').innerHTML =
+    `<span><b>${s.bpm}</b> BPM</span>` +
+    `<span>lead <b>${roles.lead||0}</b></span>` +
+    `<span>harmony <b>${roles.harmony||0}</b></span>` +
+    `<span>bass <b>${roles.bass||0}</b></span>` +
+    `<span>drums <b>${roles.percussion||0}</b></span>` +
+    `<span>density <b>${s.mean_simultaneous}</b></span>` +
+    `<span>${s.reanalyzed?'analyze '+s.analyze_seconds+'s + ':''}render <b>${s.render_seconds}s</b></span>`;
+}
+
+$('#reset').onclick = () => location.reload();
+</script>
+</body>
+</html>
