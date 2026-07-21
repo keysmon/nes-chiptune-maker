@@ -141,7 +141,7 @@ def test_arrange_section_loads_sparse_arranger_keys():
     assert cfg.arrange.chord_subdivision == 2
     assert cfg.arrange.chord_octave == 4
     assert cfg.arrange.chord_tones == 3
-    assert cfg.arrange.chord_smooth_beats == 2
+    assert cfg.arrange.chord_smooth_beats == 4
     assert cfg.arrange.melody_min_seconds == pytest.approx(0.08)
     assert cfg.arrange.bass_min_seconds == pytest.approx(0.08)
     assert cfg.arrange.harmony_rest_on_busy_melody is False

@@ -28,7 +28,7 @@ chord_comp_pattern           = "up"      # "up" / "updown" / "root_fifth"; see a
 chord_subdivision            = 2         # comped notes per beat
 chord_octave                 = 4         # mid register (C4=60); sits with the melody, declash separates collisions
 chord_tones                  = 3         # chord tones per comp cycle (root/third/fifth)
-chord_smooth_beats           = 2         # mode-smoothing window (beats) for chord detection
+chord_smooth_beats           = 4         # mode-smoothing window (beats); higher = fewer, more stable chords (less jitter)
 melody_min_seconds           = 0.08      # drop LEAD notes shorter than this (thin_melody)
 bass_min_seconds             = 0.08      # drop BASS notes shorter than this (simplify_bass)
 harmony_rest_on_busy_melody  = false     # drop harmony notes that land on a melodic attack, giving the melody space
