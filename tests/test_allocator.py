@@ -112,3 +112,18 @@ def test_unplayable_lead_pitch_is_dropped_to_silence(cfg):
     s = score_of([NoteEvent(20, 0.0, 0.5, 100, Role.LEAD)])
     tl = allocate(s, cfg)[ChannelId.PULSE1]
     assert all(f.pitch is None for f in tl.frames)
+
+
+def test_dropped_unplayable_note_warns_to_stderr(cfg, capsys):
+    """Dropping is correct, but - like midi_io's percussion warning - not silent.
+
+    An out-of-range pitch must be reported so a Phase-2 transcription feeding real
+    pitches does not silently lose notes. Mirrors the stderr warning style used
+    when midi_io drops unmapped percussion.
+    """
+    assert not playable_on_pulse(20), "pitch 20 must be genuinely unplayable on pulse"
+    s = score_of([NoteEvent(20, 0.0, 0.5, 100, Role.LEAD)])
+    allocate(s, cfg)
+    err = capsys.readouterr().err
+    assert "20" in err, f"warning must name the dropped pitch; got: {err!r}"
+    assert "lead" in err.lower(), f"warning must name the role; got: {err!r}"

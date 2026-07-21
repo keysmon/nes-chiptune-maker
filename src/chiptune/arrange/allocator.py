@@ -18,6 +18,7 @@ when borrowing lands.
 from __future__ import annotations
 
 import math
+import sys
 
 from ..config import Config
 from ..nes.tables import playable_on_pulse, playable_on_triangle
@@ -106,31 +107,63 @@ def _build_pitched_timeline(
     return ChannelTimeline(channel=channel, frames=frames)
 
 
+def _warn_dropped(dropped: dict[str, list[int]]) -> None:
+    """Report pitched notes dropped as unplayable, one line per allocate() call.
+
+    Dropping an out-of-range pitch is the correct behaviour - clamping it to the
+    register limit would sound a wrong note - but it must not be silent. This gives
+    the pitched channels the same observability midi_io already gives dropped
+    percussion, so a Phase-2 transcription feeding real pitches cannot lose notes
+    without a trace.
+    """
+    parts = [
+        f"{role} {len(pitches)} (e.g. MIDI {sorted(set(pitches))[0]})"
+        for role, pitches in dropped.items()
+        if pitches
+    ]
+    if not parts:
+        return
+    total = sum(len(p) for p in dropped.values())
+    print(
+        f"warning: dropped {total} unplayable pitched note(s) with no valid "
+        f"11-bit period: {', '.join(parts)}",
+        file=sys.stderr,
+    )
+
+
 def allocate(score: Score, cfg: Config) -> dict[ChannelId, ChannelTimeline]:
     fr = cfg.frame_rate
     n = frame_count(score.duration, fr)
+    low, high = cfg.arrange.bass_low, cfg.arrange.bass_high
 
     # --- Pulse 1: lead, highest wins ---
-    lead = [nt for nt in score.notes_with_role(Role.LEAD) if playable_on_pulse(nt.pitch)]
+    lead_notes = score.notes_with_role(Role.LEAD)
+    lead = [nt for nt in lead_notes if playable_on_pulse(nt.pitch)]
+    dropped_lead = [nt.pitch for nt in lead_notes if not playable_on_pulse(nt.pitch)]
     lead_pitches = _monophonic(lead, n, fr, pick_highest=True)
     pulse1 = _build_pitched_timeline(ChannelId.PULSE1, lead_pitches, cfg.pulse1, fixed_volume=False)
 
     # --- Triangle: bass, lowest wins, folded into range ---
     bass_notes = score.notes_with_role(Role.BASS)
+    # Counted per note (like lead/harmony) rather than per reduced frame; folding
+    # normally lands every bass pitch in a playable range, so this is a safety net.
+    dropped_bass = [nt.pitch for nt in bass_notes
+                    if not playable_on_triangle(fold_into_range(nt.pitch, low, high))]
     bass_pitches = _monophonic(bass_notes, n, fr, pick_highest=False)
     folded: list[int | None] = []
     for p in bass_pitches:
         if p is None:
             folded.append(None)
             continue
-        q = fold_into_range(p, cfg.arrange.bass_low, cfg.arrange.bass_high)
+        q = fold_into_range(p, low, high)
         folded.append(q if playable_on_triangle(q) else None)
     triangle = _build_pitched_timeline(
         ChannelId.TRIANGLE, folded, cfg.triangle, fixed_volume=True)
 
     # --- Pulse 2: harmony, arpeggiated ---
-    harmony = [nt for nt in score.notes_with_role(Role.HARMONY)
-               if playable_on_pulse(nt.pitch)]
+    harmony_notes = score.notes_with_role(Role.HARMONY)
+    harmony = [nt for nt in harmony_notes if playable_on_pulse(nt.pitch)]
+    dropped_harmony = [nt.pitch for nt in harmony_notes if not playable_on_pulse(nt.pitch)]
     harmony_pitches = arpeggiate(harmony, n, fr, cfg.arrange.arpeggio_frames)
     pulse2 = _build_pitched_timeline(
         ChannelId.PULSE2, harmony_pitches, cfg.pulse2, fixed_volume=False)
@@ -141,6 +174,8 @@ def allocate(score: Score, cfg: Config) -> dict[ChannelId, ChannelTimeline]:
         channel=ChannelId.NOISE,
         frames=allocate_percussion(perc, n, fr, cfg.drums),
     )
+
+    _warn_dropped({"lead": dropped_lead, "harmony": dropped_harmony, "bass": dropped_bass})
 
     return {
         ChannelId.PULSE1: pulse1,
