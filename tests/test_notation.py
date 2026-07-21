@@ -46,3 +46,24 @@ def test_no_usable_content_raises_for_fallback():
         parse_arrangement("KEY: C maj\nLEAD: all garbage here", GRID, OCT)
     with pytest.raises(NotationError):
         parse_arrangement("no key line at all\nLEAD: 1:1", GRID, OCT)
+
+@pytest.mark.parametrize("bad", ["inf", "nan", "1e999", "-inf"])
+def test_nonfinite_durations_are_dropped_not_raised(bad):
+    # inf/nan clear the `dur <= 0` guard (nan compares False, inf > 0) and would make
+    # a non-finite NoteEvent end -> ValueError, which escapes NotationError. Must drop.
+    text = f"KEY: C maj\nLEAD: 3:{bad} 1:1"
+    notes = [n for n in parse_arrangement(text, GRID, OCT) if n.role is Role.LEAD]
+    assert [n.pitch for n in notes] == [60]  # bad-duration token dropped, 1:1 survives
+
+def test_harmony_voice_maps_to_harmony_role():
+    text = "KEY: C maj\nHARM: 1:1 3:1"
+    notes = [n for n in parse_arrangement(text, GRID, OCT) if n.role is Role.HARMONY]
+    # HARM octave 3: degree 1 = 12*4+0 = 48 (C3), degree 3 = 52 (E3)
+    assert [n.pitch for n in notes] == [48, 52]
+
+def test_voice_split_across_lines_concatenates():
+    # A long part the LLM wraps onto a second same-voice line must append, not clobber.
+    text = "KEY: C maj\nLEAD: 1:1\nLEAD: 5:1"
+    notes = [n for n in parse_arrangement(text, GRID, OCT) if n.role is Role.LEAD]
+    assert [n.pitch for n in notes] == [60, 67]
+    assert notes[1].start == pytest.approx(0.5)  # 2nd note follows the 1st (not overwritten)

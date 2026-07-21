@@ -7,6 +7,7 @@ NotationError so the caller can fall back to the heuristic arranger.
 """
 from __future__ import annotations
 
+import math
 import sys
 
 from ..score import NoteEvent, Percussion, Role, TempoGrid
@@ -59,7 +60,10 @@ def parse_arrangement(text: str, grid: TempoGrid, octaves: dict[str, int]) -> li
             except (KeyError, IndexError):
                 key = None
         elif head in _VOICE_ROLE:
-            voices[head] = line.split(":", 1)[1] if ":" in line else ""
+            body = line.split(":", 1)[1] if ":" in line else ""
+            # A voice may span multiple lines (an LLM wrapping a long part);
+            # concatenate rather than let a later line clobber an earlier one.
+            voices[head] = f"{voices[head]} {body}" if head in voices else body
     if key is None or not voices:
         raise NotationError("no KEY or no voice lines")
 
@@ -77,7 +81,7 @@ def parse_arrangement(text: str, grid: TempoGrid, octaves: dict[str, int]) -> li
             sym, _, durs = tok.partition(":")
             try:
                 dur = float(durs)
-                if dur <= 0:
+                if not math.isfinite(dur) or dur <= 0:
                     raise ValueError
             except ValueError:
                 dropped += 1
