@@ -76,22 +76,31 @@ def test_amplitude_stays_within_unit_range(bank):
         assert np.abs(out).max() <= 1.0 + 1e-6
 
 
-def test_amplitude_is_consistent_across_octaves(bank):
-    """A fixed duty must sound equally loud in every octave. Each octave uses its
-    own band-limited table with a different harmonic count, so without per-table
-    normalization the peak drifts across octaves and collapses at the top, where
-    only one or two harmonics survive - an audible loudness jump whenever a melody
-    crosses an octave boundary. Narrow duty 0.125 is the stress case (~12 dB swing).
+def test_fundamental_amplitude_is_consistent_across_octaves(bank):
+    """A note's perceived loudness is its fundamental, and a pulse's fundamental
+    amplitude (2/pi)*sin(pi*duty) does NOT depend on octave. The mip pyramid must
+    preserve that: high-octave tables legitimately keep fewer harmonics (a thinner
+    tone - authentic NES band-limiting), but the fundamental must stay put.
 
-    The probe MIDIs must span that swing to catch the defect: 48/72/96/120 land in
-    octave tables 3/5/7/9, and octave 9 is where the collapse begins. (The brief's
-    suggested 48/60/72 all sit in the flat mid-region - peaks 0.966/0.960/0.961 -
-    so that set passes even with the bug, and would not test anything.)
+    Normalizing each table to its OWN peak would divide the sparse high-octave
+    tables by a smaller number and scale their fundamental up, inverting the
+    loudness by ~12 dB for narrow duties. A single global gain keeps the
+    fundamental flat. This asserts the fundamental, NOT overall peak or RMS - those
+    legitimately differ across octaves because high notes carry fewer harmonics.
+
+    Duty 0.125 is the stress case, and the probe MIDIs must reach the top octaves
+    where the harmonic count collapses: 48/72/96/120 land in octave tables 3/5/7/9.
+    (The suggested 48/60/72 all sit in octaves 3/4/5, where every table still holds
+    dozens of harmonics and per-table peaks are near-equal - so that set passes
+    even with the inverting bug and would test nothing.)
     """
     duty = 0.125
-    peaks = []
+    mags = []
     for midi in (48, 72, 96, 120):
         freq = 440.0 * 2.0 ** ((midi - 69) / 12.0)
         out, _ = bank.render(freq_hz=freq, duty=duty, n_samples=SR, phase=0.0)
-        peaks.append(float(np.abs(out).max()))
-    assert max(peaks) - min(peaks) < 0.02, f"octave peaks vary by too much: {peaks}"
+        spec = np.abs(np.fft.rfft(out * np.hanning(len(out))))
+        freqs = np.fft.rfftfreq(len(out), 1 / SR)
+        mags.append(float(spec[np.argmin(np.abs(freqs - freq))]))
+    assert (max(mags) - min(mags)) / max(mags) < 0.10, \
+        f"fundamental amplitude varies across octaves: {mags}"

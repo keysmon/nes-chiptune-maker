@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..config import VALID_DUTIES
+
 # One table per octave, covering MIDI 0 (8.18 Hz) through MIDI 127 (12543 Hz).
 N_OCTAVES = 11
 BASE_HZ = 8.1758  # MIDI note 0
@@ -25,7 +27,9 @@ class PulseBank:
             raise ValueError(f"sample_rate must be positive (got {sample_rate})")
         self.sample_rate = sample_rate
         self.table_size = table_size
+        self._raw: dict[tuple[float, int], np.ndarray] = {}
         self._tables: dict[tuple[float, int], np.ndarray] = {}
+        self._gain: float | None = None
 
     def _octave_index(self, freq_hz: float) -> int:
         if freq_hz <= 0:
@@ -33,9 +37,10 @@ class PulseBank:
         idx = int(np.floor(np.log2(freq_hz / BASE_HZ)))
         return max(0, min(N_OCTAVES - 1, idx))
 
-    def _table(self, duty: float, octave: int) -> np.ndarray:
+    def _raw_table(self, duty: float, octave: int) -> np.ndarray:
+        """Un-normalized band-limited pulse table for one (duty, octave) band."""
         key = (duty, octave)
-        cached = self._tables.get(key)
+        cached = self._raw.get(key)
         if cached is not None:
             return cached
 
@@ -50,18 +55,39 @@ class PulseBank:
             amp = (2.0 / (n * np.pi)) * np.sin(n * np.pi * duty)
             table += amp * np.cos(2.0 * np.pi * n * t)
 
-        # Normalize EVERY table to a common reference peak of 1.0, not just those
-        # that overshoot it. Each octave keeps a different number of harmonics, so
-        # the raw peak drifts across octaves - and collapses at the top, where only
-        # one or two harmonics survive (e.g. duty 0.125 falls from ~0.96 to 0.24, a
-        # ~12 dB drop). Without this, a melody crossing an octave boundary jumps in
-        # loudness. Peak (not RMS) is the reference because RMS-normalizing the
-        # single-cosine top octave would push its peak to sqrt(2), breaking the
-        # unit-range guarantee the mixer's 0-15 DAC scaling depends on.
-        peak = np.abs(table).max()
-        if peak > 0.0:
-            table /= peak
+        self._raw[key] = table
+        return table
 
+    def _global_gain(self) -> float:
+        """One scalar for the whole bank: 1 / (max peak over every valid table).
+
+        A pulse's fundamental amplitude is (2/pi)*sin(pi*duty) and does NOT depend
+        on octave, so the note's perceived loudness is already constant across the
+        mip pyramid. What differs is the overall peak: high-octave tables keep only
+        the harmonics under Nyquist (as few as one), so their peak is lower even
+        though the fundamental is identical. Normalizing each table to its OWN peak
+        would therefore divide the high octaves by a smaller number and scale their
+        fundamental *up* - a ~12 dB loudness inversion for narrow duties. A single
+        global gain instead rescales the whole bank uniformly: it guarantees no
+        table clips (the loudest just reaches 1.0) while leaving the fundamentals
+        constant. High notes stay legitimately thinner - that is authentic NES
+        band-limiting, not a defect to equalize away.
+        """
+        if self._gain is None:
+            peak = 0.0
+            for duty in VALID_DUTIES:
+                for octave in range(N_OCTAVES):
+                    peak = max(peak, float(np.abs(self._raw_table(duty, octave)).max()))
+            self._gain = 1.0 / peak if peak > 0.0 else 1.0
+        return self._gain
+
+    def _table(self, duty: float, octave: int) -> np.ndarray:
+        key = (duty, octave)
+        cached = self._tables.get(key)
+        if cached is not None:
+            return cached
+
+        table = self._raw_table(duty, octave) * self._global_gain()
         self._tables[key] = table
         return table
 
