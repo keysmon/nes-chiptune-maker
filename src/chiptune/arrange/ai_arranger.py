@@ -28,7 +28,9 @@ _SYSTEM = (
     "Keep it sparse and deliberate - space is good. "
     "Output ONLY these lines, nothing else:\n"
     "KEY: <root> <maj|min>\nLEAD: <deg:beats> ...\nHARM: ...\nBASS: ...\nDRUMS: <KSH:beats> ...\n"
-    "Durations are in beats. Use R for rests."
+    "Durations are in beats. Use R for rests. "
+    "Each voice's durations MUST sum to about the total beats stated for the song - "
+    "match the song's length and NEVER exceed it."
 )
 
 
@@ -37,9 +39,14 @@ def format_prompt(score: Score) -> str:
     spb = score.tempo.seconds_per_beat
     mel = " ".join(f"{_NAMES[n.pitch % 12]}{n.pitch // 12 - 1}:{round((n.end - n.start) / spb, 2)}"
                    for n in lead) or "(none)"
+    total_beats = max(1, round(score.duration / spb)) if spb > 0 else 1
+    bars = max(1, round(total_beats / score.tempo.beats_per_bar))
     return (f"TEMPO: {round(score.tempo.bpm, 1)} BPM\n"
+            f"LENGTH: about {round(score.duration)} s = ~{bars} bars = ~{total_beats} beats total.\n"
             f"MELODY (note:beats): {mel}\n\n"
-            "Arrange this for the NES 4 voices now.")
+            f"Arrange this for the NES 4 voices now. Each voice's durations must sum to about "
+            f"{total_beats} beats - do NOT exceed the song's length. Give DRUMS a simple repeating "
+            "groove unless the piece is clearly drumless.")
 
 
 def _call_llm(prompt: str, cfg: AIConfig) -> str:
@@ -59,9 +66,15 @@ def _call_llm(prompt: str, cfg: AIConfig) -> str:
 def arrange(score: Score, ai_cfg: AIConfig, octaves: dict[str, int] | None,
             heuristic_fn: Callable[[], Score]) -> Score:
     octaves = octaves or _DEFAULT_OCTAVES
+    # Cap the arrangement near the song length so a length-runaway (the LLM writing
+    # a 590s bass line for a 30s song) is truncated to the song, not the 600s
+    # buffer-safety rail. 1.5x with an 8s floor: generous enough that bar-rounding on
+    # a short song is never truncated, tight enough to catch a gross (10-20x) runaway.
+    # parse_arrangement further clamps this to the absolute rail.
+    max_seconds = max(score.duration * 1.5, score.duration + 8.0)
     try:
         text = _call_llm(format_prompt(score), ai_cfg)
-        notes = parse_arrangement(text, score.tempo, octaves)
+        notes = parse_arrangement(text, score.tempo, octaves, max_seconds=max_seconds)
     except NotationError as exc:
         print(f"chiptune.ai_arranger: unparseable output ({exc}); using heuristic", file=sys.stderr)
         return heuristic_fn()

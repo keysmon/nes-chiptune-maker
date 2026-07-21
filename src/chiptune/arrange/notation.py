@@ -50,8 +50,14 @@ def _degree_to_semitone(token: str, is_minor: bool) -> int:
     return scale[degree - 1] + acc + 12 * octs
 
 
-def parse_arrangement(text: str, grid: TempoGrid, octaves: dict[str, int]) -> list[NoteEvent]:
+def parse_arrangement(text: str, grid: TempoGrid, octaves: dict[str, int],
+                      max_seconds: float = _MAX_ARRANGEMENT_SECONDS) -> list[NoteEvent]:
     spb = grid.seconds_per_beat
+    # Song-relative length cap: the arrangement should be about the song's length,
+    # not the 600s crash-rail. Callers pass ~1.5x the song duration; a voice the LLM
+    # lets run away (e.g. a 30s song arranged as 590s of bass) is truncated here.
+    # Never exceed the absolute buffer-safety rail regardless of what a caller passes.
+    cap = min(max_seconds, _MAX_ARRANGEMENT_SECONDS)
     key = None
     voices: dict[str, str] = {}
     for raw in text.splitlines():
@@ -92,9 +98,10 @@ def parse_arrangement(text: str, grid: TempoGrid, octaves: dict[str, int]) -> li
                 dropped += 1
                 continue
             end = t + dur * spb
-            if end > _MAX_ARRANGEMENT_SECONDS:
-                # Finite but absurd (e.g. "1:100000"): would OOM the render buffer
-                # outside the fallback. Drop without advancing t (bounds total length).
+            if end > cap:
+                # Past the song-relative cap (or the absolute buffer-safety rail):
+                # a finite-but-absurd duration ("1:100000") or an LLM that ran the
+                # voice far past the song's length. Drop without advancing t.
                 dropped += 1
                 continue
             if role is Role.PERCUSSION:

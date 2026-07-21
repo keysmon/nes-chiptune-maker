@@ -63,6 +63,15 @@ def test_absurd_finite_duration_is_dropped_not_rendered():
     assert [n.pitch for n in notes] == [67]      # 1:100000 dropped, 5:1 (G4) survives
     assert all(n.end <= 600.0 for n in notes)    # nothing beyond the safety rail reaches the synth
 
+def test_max_seconds_truncates_a_runaway_voice():
+    # A voice that runs far past the song length is truncated to the song-relative
+    # cap, not the 600s rail. GRID is 0.5 s/beat, so 5 notes of 2 beats end at
+    # 1/2/3/4/5 s; max_seconds=4.0 drops the note ending at 5 s.
+    text = "KEY: C maj\nBASS: 1:2 1:2 1:2 1:2 1:2"
+    notes = [n for n in parse_arrangement(text, GRID, OCT, max_seconds=4.0) if n.role is Role.BASS]
+    assert notes and all(n.end <= 4.0 for n in notes)
+    assert max(n.end for n in notes) == pytest.approx(4.0)  # kept everything up to the cap
+
 def test_harmony_voice_maps_to_harmony_role():
     text = "KEY: C maj\nHARM: 1:1 3:1"
     notes = [n for n in parse_arrangement(text, GRID, OCT) if n.role is Role.HARMONY]
