@@ -20,6 +20,19 @@ borrow_hysteresis_frames = 15     # delay before handing a borrowed channel back
 velocity_floor           = 0.35   # quietest note still plays at this fraction of channel volume; 1.0 = velocity ignored
 reattack_gap             = 0.02   # seconds; silence inserted before a repeated same-pitch lead/bass note so it re-attacks; 0 = off
 
+# Sparse arranger (chiptune.analysis.build_score): "chords" replaces basic-pitch
+# transcription of the "other" stem (hundreds of noisy overlapping notes) with a
+# clean chord-progression comp; "transcribe" reproduces the old note-soup path.
+harmony_mode                 = "chords"  # "chords" or "transcribe"
+chord_comp_pattern           = "up"      # "up" / "updown" / "root_fifth"; see arrange.chord_comp
+chord_subdivision            = 2         # comped notes per beat
+chord_octave                 = 4         # mid register (C4=60); sits with the melody, declash separates collisions
+chord_tones                  = 3         # chord tones per comp cycle (root/third/fifth)
+chord_smooth_beats           = 2         # mode-smoothing window (beats) for chord detection
+melody_min_seconds           = 0.08      # drop LEAD notes shorter than this (thin_melody)
+bass_min_seconds             = 0.08      # drop BASS notes shorter than this (simplify_bass)
+harmony_rest_on_busy_melody  = false     # reserved; not yet wired to any behavior
+
 # duty: 0.125 / 0.25 / 0.5 / 0.75 are the only values the real chip supports
 [pulse1]                          # lead
 duty = 0.5

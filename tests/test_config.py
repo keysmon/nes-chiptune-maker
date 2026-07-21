@@ -37,14 +37,22 @@ VALID_VIBRATO = (
 )
 
 
+VALID_ARRANGE = (
+    "[arrange]\nsubdivision=16\nquantize_strength=1.0\nmin_duration=0.03\n"
+    "arpeggio_frames=2\nbass_low=28\nbass_high=55\nborrow_enabled=false\n"
+    "borrow_idle_frames=30\nborrow_hysteresis_frames=15\nvelocity_floor=0.35\n"
+    "reattack_gap=0.02\nharmony_mode=\"chords\"\nchord_comp_pattern=\"up\"\n"
+    "chord_subdivision=2\nchord_octave=4\nchord_tones=3\nchord_smooth_beats=2\n"
+    "melody_min_seconds=0.08\nbass_min_seconds=0.08\n"
+    "harmony_rest_on_busy_melody=false\n"
+)
+
+
 def test_rejects_invalid_duty(tmp_path):
     bad = tmp_path / "bad.toml"
     bad.write_text(
         "sample_rate=44100\nframe_rate=60.0\n"
-        "[arrange]\nsubdivision=16\nquantize_strength=1.0\nmin_duration=0.03\n"
-        "arpeggio_frames=2\nbass_low=28\nbass_high=55\nborrow_enabled=false\n"
-        "borrow_idle_frames=30\nborrow_hysteresis_frames=15\nvelocity_floor=0.35\n"
-        "reattack_gap=0.02\n"
+        f"{VALID_ARRANGE}"
         f"[pulse1]\nduty=0.33\n{VALID_CHANNEL}"
         f"[pulse2]\nduty=0.25\n{VALID_CHANNEL}"
         f"[triangle]\nduty=0.0\n{VALID_CHANNEL}"
@@ -124,6 +132,60 @@ def test_analysis_section_loads():
     assert 0 < cfg.analysis.hat_high_frac_min <= 1
     assert cfg.analysis.min_note_seconds > 0
     assert cfg.analysis.harmony_declash is True
+
+
+def test_arrange_section_loads_sparse_arranger_keys():
+    cfg = load_config()
+    assert cfg.arrange.harmony_mode == "chords"
+    assert cfg.arrange.chord_comp_pattern == "up"
+    assert cfg.arrange.chord_subdivision == 2
+    assert cfg.arrange.chord_octave == 4
+    assert cfg.arrange.chord_tones == 3
+    assert cfg.arrange.chord_smooth_beats == 2
+    assert cfg.arrange.melody_min_seconds == pytest.approx(0.08)
+    assert cfg.arrange.bass_min_seconds == pytest.approx(0.08)
+    assert cfg.arrange.harmony_rest_on_busy_melody is False
+
+
+def test_rejects_unknown_arrange_key(tmp_path):
+    bad = tmp_path / "bad.toml"
+    bad.write_text(
+        "sample_rate=44100\nframe_rate=60.0\n"
+        "[arrange]\nsubdivision=16\nquantize_strength=1.0\nmin_duration=0.03\n"
+        "arpeggio_frames=2\nbass_low=28\nbass_high=55\nborrow_enabled=false\n"
+        "borrow_idle_frames=30\nborrow_hysteresis_frames=15\nvelocity_floor=0.35\n"
+        "reattack_gap=0.02\nharmony_mode=\"chords\"\nharmnoy_mode=\"chords\"\n"
+        f"[pulse1]\nduty=0.5\n{VALID_CHANNEL}"
+        f"[pulse2]\nduty=0.25\n{VALID_CHANNEL}"
+        f"[triangle]\nduty=0.0\n{VALID_CHANNEL}"
+        f"[noise]\nduty=0.0\n{VALID_CHANNEL}"
+        f"{VALID_ANALYSIS}"
+        f"{VALID_VIBRATO}"
+    )
+    with pytest.raises(ValueError, match="harmnoy_mode"):
+        load_config(bad)
+
+
+def test_rejects_invalid_harmony_mode(tmp_path):
+    bad = tmp_path / "bad.toml"
+    bad.write_text(
+        "sample_rate=44100\nframe_rate=60.0\n"
+        "[arrange]\nsubdivision=16\nquantize_strength=1.0\nmin_duration=0.03\n"
+        "arpeggio_frames=2\nbass_low=28\nbass_high=55\nborrow_enabled=false\n"
+        "borrow_idle_frames=30\nborrow_hysteresis_frames=15\nvelocity_floor=0.35\n"
+        "reattack_gap=0.02\nharmony_mode=\"riffs\"\nchord_comp_pattern=\"up\"\n"
+        "chord_subdivision=2\nchord_octave=4\nchord_tones=3\nchord_smooth_beats=2\n"
+        "melody_min_seconds=0.08\nbass_min_seconds=0.08\n"
+        "harmony_rest_on_busy_melody=false\n"
+        f"[pulse1]\nduty=0.5\n{VALID_CHANNEL}"
+        f"[pulse2]\nduty=0.25\n{VALID_CHANNEL}"
+        f"[triangle]\nduty=0.0\n{VALID_CHANNEL}"
+        f"[noise]\nduty=0.0\n{VALID_CHANNEL}"
+        f"{VALID_ANALYSIS}"
+        f"{VALID_VIBRATO}"
+    )
+    with pytest.raises(ValueError, match="harmony_mode"):
+        load_config(bad)
 
 
 def test_vibrato_section_loads():
