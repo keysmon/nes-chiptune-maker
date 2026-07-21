@@ -16,6 +16,31 @@ DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "nes.toml
 VALID_DUTIES = (0.125, 0.25, 0.5, 0.75)
 VALID_DRUM_KEYS = frozenset({"kick", "snare", "hat"})
 VALID_LEVEL_KEYS = frozenset({"pulse1", "pulse2", "triangle", "noise"})
+VALID_HARMONY_MODES = frozenset({"chords", "transcribe"})
+# Must match the patterns chiptune.arrange.chord_comp.comp_chords understands.
+VALID_CHORD_COMP_PATTERNS = frozenset({"up", "updown", "root_fifth"})
+VALID_ARRANGE_KEYS = frozenset({
+    "subdivision",
+    "quantize_strength",
+    "min_duration",
+    "arpeggio_frames",
+    "bass_low",
+    "bass_high",
+    "borrow_enabled",
+    "borrow_idle_frames",
+    "borrow_hysteresis_frames",
+    "velocity_floor",
+    "reattack_gap",
+    "harmony_mode",
+    "chord_comp_pattern",
+    "chord_subdivision",
+    "chord_octave",
+    "chord_tones",
+    "chord_smooth_beats",
+    "melody_min_seconds",
+    "bass_min_seconds",
+    "harmony_rest_on_busy_melody",
+})
 VALID_ANALYSIS_KEYS = frozenset({
     "include_vocals",
     "vocal_fmin",
@@ -70,6 +95,18 @@ class ArrangeConfig:
     borrow_hysteresis_frames: int
     velocity_floor: float
     reattack_gap: float
+    # Sparse arranger (chiptune.arrange.sparse / chord_comp / analysis.chords):
+    # replaces basic-pitch-on-"other" HARMONY with a clean chord comp, and
+    # thins LEAD/BASS ornaments - see chiptune.analysis.build_score.
+    harmony_mode: str
+    chord_comp_pattern: str
+    chord_subdivision: int
+    chord_octave: int
+    chord_tones: int
+    chord_smooth_beats: int
+    melody_min_seconds: float
+    bass_min_seconds: float
+    harmony_rest_on_busy_melody: bool
 
     def __post_init__(self) -> None:
         if self.bass_low >= self.bass_high:
@@ -80,6 +117,27 @@ class ArrangeConfig:
             raise ValueError(f"velocity_floor must be in [0, 1], got {self.velocity_floor}")
         if self.reattack_gap < 0:
             raise ValueError(f"reattack_gap must be >= 0, got {self.reattack_gap}")
+        if self.harmony_mode not in VALID_HARMONY_MODES:
+            raise ValueError(
+                f"harmony_mode {self.harmony_mode!r} must be one of {sorted(VALID_HARMONY_MODES)}"
+            )
+        if self.chord_comp_pattern not in VALID_CHORD_COMP_PATTERNS:
+            raise ValueError(
+                f"chord_comp_pattern {self.chord_comp_pattern!r} must be one of "
+                f"{sorted(VALID_CHORD_COMP_PATTERNS)}"
+            )
+        if not 1 <= self.chord_subdivision <= 16:
+            raise ValueError(f"chord_subdivision must be 1-16, got {self.chord_subdivision}")
+        if self.chord_tones < 1:
+            raise ValueError(f"chord_tones must be >= 1, got {self.chord_tones}")
+        if not 0 <= self.chord_octave <= 8:
+            raise ValueError(f"chord_octave must be 0-8, got {self.chord_octave}")
+        if self.chord_smooth_beats < 1:
+            raise ValueError(f"chord_smooth_beats must be >= 1, got {self.chord_smooth_beats}")
+        if self.melody_min_seconds < 0:
+            raise ValueError(f"melody_min_seconds must be >= 0, got {self.melody_min_seconds}")
+        if self.bass_min_seconds < 0:
+            raise ValueError(f"bass_min_seconds must be >= 0, got {self.bass_min_seconds}")
 
 
 @dataclass(frozen=True)
@@ -201,6 +259,15 @@ def load_config(path: str | Path | None = None) -> Config:
         raise ValueError(
             f"config {path} has unknown [levels] key {sorted(bad_levels)[0]!r}; "
             f"levels must be one of {sorted(VALID_LEVEL_KEYS)}"
+        )
+
+    if "arrange" not in raw:
+        raise ValueError(f"config {path} is missing required [arrange] section")
+    bad_arrange = set(raw["arrange"]) - VALID_ARRANGE_KEYS
+    if bad_arrange:
+        raise ValueError(
+            f"config {path} has unknown [arrange] key {sorted(bad_arrange)[0]!r}; "
+            f"arrange must be one of {sorted(VALID_ARRANGE_KEYS)}"
         )
 
     if "analysis" not in raw:
