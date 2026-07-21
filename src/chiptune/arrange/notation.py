@@ -123,6 +123,6 @@ def parse_arrangement(text: str, grid: TempoGrid, octaves: dict[str, int]) -> li
     if not notes:
         raise NotationError("no notes parsed from any voice")
     if dropped:
-        print(f"chiptune.ai_arranger: dropped {dropped} malformed token(s)", file=sys.stderr)
+        print(f"chiptune.ai_arranger: dropped {dropped} malformed or out-of-range token(s)", file=sys.stderr)
     notes.sort(key=lambda n: (n.start, n.pitch))
     return notes
