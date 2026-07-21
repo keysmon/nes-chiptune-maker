@@ -34,7 +34,10 @@ def rearticulate(
         if nxt.start - cur.end >= gap_seconds:
             continue
         new_end = nxt.start - gap_seconds
-        if new_end - cur.start < min_duration:
+        # Drop the trim if it would leave the note below min_duration, and never
+        # let it reach or cross the onset (guards NoteEvent's end>start even if a
+        # caller passes min_duration=0).
+        if new_end <= cur.start or new_end - cur.start < min_duration:
             continue
         out[i] = replace(cur, end=new_end)
     return out

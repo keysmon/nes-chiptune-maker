@@ -48,8 +48,8 @@ def render_score(score: Score, config_path=None, out_path="out/chiptune.wav") ->
         highpass_hz=cfg.output_highpass_hz,
         lowpass_hz=cfg.output_lowpass_hz,
     )
-    # Validate the RAW mix so a genuine clip or NaN fails the build loudly; only
-    # then clamp for output, guarding float-epsilon overshoot on a checked signal.
+    # Validate the filtered, un-clamped mix so a genuine clip or NaN fails the build
+    # loudly; only then clamp for output, guarding float-epsilon overshoot.
     check_invariants(timelines, raw_mix)
     wav = np.clip(raw_mix, -1.0, 1.0)
 

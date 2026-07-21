@@ -61,8 +61,9 @@ def check_invariants(
             "output is not finite: contains NaN or inf samples"
         )
 
-    # 5. No clipping. This now runs on the raw pre-clamp mix (see mixer.nes_mix), so a
-    #    genuine clip fails the build loudly instead of being silently distorted.
+    # 5. No clipping. This runs on the un-clamped mix (post output-filter, pre np.clip;
+    #    see cli.render_score), so a genuine clip fails the build loudly instead of
+    #    being silently distorted by the clamp.
     if samples.size and float(np.abs(samples).max()) > 1.0:
         raise InvariantViolation(
             f"output clips: peak {float(np.abs(samples).max()):.4f} exceeds 1.0"

@@ -41,7 +41,10 @@ def _compress(signal: np.ndarray, numerator: float, divisor_k: float) -> np.ndar
     channel). For non-negative input it is identical to ``np.where(x > 0, ..., 0)``.
     """
     mag = np.abs(signal)
-    with np.errstate(divide="ignore", invalid="ignore"):
+    # over: a tiny-but-nonzero |signal| makes divisor_k/mag overflow to inf, then
+    # numerator/inf -> 0.0, which the outer np.where discards anyway. All three are
+    # the correct limits, so silence the cosmetic warnings.
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
         compressed = np.where(
             mag > 0.0,
             numerator / (divisor_k / np.where(mag > 0.0, mag, 1.0) + 100.0),

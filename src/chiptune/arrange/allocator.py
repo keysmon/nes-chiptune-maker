@@ -104,7 +104,7 @@ def _build_pitched_timeline(
     pitches: list[int | None],
     cfg_channel,
     fixed_volume: bool,
-    velocity_floor: float,
+    velocity_floor: float = 1.0,
     velocities: list[int | None] | None = None,
 ) -> ChannelTimeline:
     frames: list[FrameEvent] = []
@@ -122,8 +122,11 @@ def _build_pitched_timeline(
             vol = cfg_channel.volume
         else:
             vol = _envelope_volume(cfg_channel, held, cfg_channel.volume)
-            if velocities is not None:
-                vol = _scale_by_velocity(vol, velocities[i], velocity_floor)
+            # velocities is None-aligned with pitches (same winner), so a non-None
+            # pitch here has a non-None velocity; bind to a local so the guard narrows.
+            vel = velocities[i] if velocities is not None else None
+            if vel is not None:
+                vol = _scale_by_velocity(vol, vel, velocity_floor)
         frames.append(FrameEvent(pitch=p, volume=max(0, min(15, vol))))
         prev = p
     return ChannelTimeline(channel=channel, frames=frames)
@@ -190,10 +193,9 @@ def allocate(score: Score, cfg: Config) -> dict[ChannelId, ChannelTimeline]:
         q = fold_into_range(p, low, high)
         folded.append(q if playable_on_triangle(q) else None)
     # No `velocities` passed: fixed_volume=True means the triangle build never
-    # reads them, so its "on or off" hardware constraint is untouched by velocity.
+    # scales by velocity, so its "on or off" hardware constraint is untouched.
     triangle = _build_pitched_timeline(
-        ChannelId.TRIANGLE, folded, cfg.triangle, fixed_volume=True,
-        velocity_floor=cfg.arrange.velocity_floor)
+        ChannelId.TRIANGLE, folded, cfg.triangle, fixed_volume=True)
 
     # --- Pulse 2: harmony, arpeggiated ---
     # Arpeggiation already re-strikes every chord tone every `arpeggio_frames`;
@@ -204,9 +206,10 @@ def allocate(score: Score, cfg: Config) -> dict[ChannelId, ChannelTimeline]:
     harmony = [nt for nt in harmony_notes if playable_on_pulse(nt.pitch)]
     dropped_harmony = [nt.pitch for nt in harmony_notes if not playable_on_pulse(nt.pitch)]
     harmony_pitches = arpeggiate(harmony, n, fr, cfg.arrange.arpeggio_frames)
+    # No `velocities`: harmony velocity is a filed follow-up (needs arpeggiate() to
+    # carry per-frame velocity), so Pulse 2 keeps its envelope-only volume for now.
     pulse2 = _build_pitched_timeline(
-        ChannelId.PULSE2, harmony_pitches, cfg.pulse2, fixed_volume=False,
-        velocity_floor=cfg.arrange.velocity_floor)
+        ChannelId.PULSE2, harmony_pitches, cfg.pulse2, fixed_volume=False)
 
     # --- Noise: percussion ---
     perc = score.notes_with_role(Role.PERCUSSION)
