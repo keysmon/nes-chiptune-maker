@@ -42,7 +42,11 @@ def transcribe_vocals(
     run_pitch = None
 
     def close_run(end_idx: int) -> None:
-        if run_start is None:
+        # run_start and run_pitch are always set (or cleared) together below,
+        # but pyright can't infer that correlation across two separate
+        # closured variables - check both explicitly so it narrows run_pitch
+        # from `int | None` to `int` for the np.clip call.
+        if run_start is None or run_pitch is None:
             return
         start = run_start * HOP_LENGTH / sr
         end = end_idx * HOP_LENGTH / sr
