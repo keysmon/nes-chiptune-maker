@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang=en>
+<head>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Chiptune Maker - live playground</title>
+<style>
+:root{--bg:#0d0f1a;--panel:#161a2b;--panel2:#1d2233;--fg:#e8e8f0;--mut:#8a90b0;--grid:#2a2d42;--accent:#39ff9e;--accent2:#5a83e0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:ui-monospace,'DejaVu Sans Mono',Menlo,monospace;padding:22px;line-height:1.5}
+h1{font-size:21px;margin:0}.tag{color:var(--accent)}
+.sub{color:var(--mut);font-size:13px;margin:3px 0 16px;max-width:760px}
+.sub a{color:var(--accent2)}
+.wrap{display:grid;grid-template-columns:1fr 360px;gap:18px;align-items:start}
+@media(max-width:880px){.wrap{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+.card h2{font-size:12px;margin:0 0 12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.player-label{font-size:12px;color:var(--mut);margin-top:10px}.player-label.chip{color:var(--accent)}
+audio{width:100%;margin-top:6px;filter:invert(.9) hue-rotate(180deg)}
+.ab{display:flex;gap:8px;margin-bottom:6px}
+.ab button{flex:1;background:#232840;color:var(--fg);border:1px solid var(--grid);border-radius:8px;padding:10px;font:inherit;cursor:pointer}
+.ab button.on{background:#2f8f5b;border-color:#3fae70;font-weight:600}
+button{background:#232840;color:var(--fg);border:1px solid var(--grid);border-radius:8px;padding:9px 15px;font:inherit;cursor:pointer}
+.groupname{color:var(--accent2);font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;border-top:1px solid var(--grid);padding-top:12px}
+.groupname:first-child{border-top:none;margin-top:0}
+.ctrl{margin-bottom:10px}.ctrl .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ctrl label{font-size:12.5px}.ctrl .val{font-variant-numeric:tabular-nums;color:var(--mut);font-size:12px;min-width:48px;text-align:right}
+input[type=range]{width:100%;accent-color:var(--accent2);margin-top:3px}
+input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+#status{font-size:13px;color:var(--mut);min-height:20px;margin-top:10px}#status .spin{color:var(--accent)}
+.stats{font-size:12px;color:var(--mut);margin-top:10px}.stats b{color:var(--fg)}
+.note{color:var(--mut);font-size:11px;margin-top:10px;border-top:1px solid var(--grid);padding-top:10px}
+</style>
+</head>
+<body>
+<h1>Chiptune <span class=tag>Maker</span> - live playground</h1>
+<div class=sub>A song separated, transcribed, and re-arranged for the NES 2A03's four voices - then tuned live in your browser.
+This hosted demo ships pre-analyzed songs and runs the synthesizer per request. To convert <b>your own</b> songs, run the full app locally:
+<a href="https://github.com/keysmon/nes-chiptune-maker">github.com/keysmon/nes-chiptune-maker</a>.</div>
+
+<div class=wrap>
+  <div class=left>
+    <div class=card>
+      <h2>Listen</h2>
+      <div class=player-label>Original (pop.00000)</div>
+      <audio id=orig controls src="/pop-original.mp3"></audio>
+      <div class=player-label chip>Chiptune</div>
+      <audio id=chip controls></audio>
+      <div style="margin-top:12px"><a id=dl><button id=dlBtn disabled>Download .wav</button></a></div>
+      <div id=status></div>
+      <div class=stats id=stats></div>
+      <div class=note>The full local app also does live song upload, chord-octave/pattern, melody &amp; bass thinning, and de-clash - anything that needs re-analysis. This playground exposes the synthesis controls (instant) plus the harmony A/B.</div>
+    </div>
+  </div>
+
+  <div class=card>
+    <h2>Customize</h2>
+    <div class=groupname>Harmony source</div>
+    <div class=ab>
+      <button id=hChords class=on>chords (clean)</button>
+      <button id=hTrans>transcribe (raw)</button>
+    </div>
+    <div style="color:var(--mut);font-size:11px;margin-bottom:4px">The A/B that matters: detected-chord comping vs. the raw note-for-note (muddier) harmony.</div>
+    <div id=controls></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let harmony = 'chords', values = {}, timer = null, rendering = false, queued = false;
+
+const CONTROLS = [
+  {g:'Levels', p:'levels.pulse1', l:'Lead', min:0, max:1.5, step:.05, d:1.0},
+  {g:'Levels', p:'levels.pulse2', l:'Harmony', min:0, max:1.5, step:.05, d:0.85},
+  {g:'Levels', p:'levels.triangle', l:'Bass', min:0, max:1.5, step:.05, d:1.0},
+  {g:'Levels', p:'levels.noise', l:'Drums', min:0, max:1.5, step:.05, d:0.6},
+  {g:'Feel', p:'arrange.quantize_strength', l:'Timing tightness', min:0, max:1, step:.05, d:0.85},
+  {g:'Feel', p:'arrange.arpeggio_frames', l:'Arpeggio rate', min:1, max:6, step:1, d:2},
+  {g:'Feel', p:'arrange.velocity_floor', l:'Dynamics range', min:.1, max:1, step:.05, d:0.35},
+  {g:'Vibrato', p:'vibrato.enabled', l:'Vibrato', toggle:true, d:true},
+  {g:'Vibrato', p:'vibrato.rate_hz', l:'Rate (Hz)', min:0, max:10, step:.5, d:6},
+  {g:'Vibrato', p:'vibrato.depth_semitones', l:'Depth (semitones)', min:0, max:1, step:.05, d:0.25},
+  {g:'Drums', p:'drums.kick.volume', l:'Kick vol', min:0, max:15, step:1, d:11},
+  {g:'Drums', p:'drums.kick.period_index', l:'Kick pitch', min:0, max:15, step:1, d:14},
+  {g:'Drums', p:'drums.snare.volume', l:'Snare vol', min:0, max:15, step:1, d:9},
+  {g:'Drums', p:'drums.hat.volume', l:'Hat vol', min:0, max:15, step:1, d:4},
+  {g:'Drums', p:'noise_lowpass_hz', l:'Drum tone (Hz)', min:1000, max:12000, step:250, d:4000},
+  {g:'Output', p:'output_lowpass_hz', l:'Warmth (Hz)', min:6000, max:20000, step:500, d:13000},
+];
+
+function build(){
+  const host = $('#controls'); let last=null;
+  for(const c of CONTROLS){
+    values[c.p] = c.d;
+    if(c.g!==last){ last=c.g; const g=document.createElement('div'); g.className='groupname'; g.textContent=c.g; host.appendChild(g); }
+    const el=document.createElement('div'); el.className='ctrl';
+    if(c.toggle){
+      el.innerHTML=`<div class=row><label>${c.l}</label><input type=checkbox ${c.d?'checked':''}></div>`;
+      el.querySelector('input').onchange=e=>{values[c.p]=e.target.checked; go();};
+    } else {
+      el.innerHTML=`<div class=row><label>${c.l}</label><span class=val>${c.d}</span></div><input type=range min=${c.min} max=${c.max} step=${c.step} value=${c.d}>`;
+      const v=el.querySelector('.val');
+      el.querySelector('input').oninput=e=>{values[c.p]=parseFloat(e.target.value); v.textContent=e.target.value;};
+      el.querySelector('input').onchange=()=>go();
+    }
+    host.appendChild(el);
+  }
+}
+
+function expand(flat){ const o={}; for(const [p,v] of Object.entries(flat)){ const ps=p.split('.'); let n=o; for(let i=0;i<ps.length-1;i++) n=n[ps[i]]??=(n[ps[i]]={}); n[ps.at(-1)]=v; } return o; }
+function status(m,s){ $('#status').innerHTML = s?`<span class=spin>${m}</span>`:m; }
+function go(){ clearTimeout(timer); timer=setTimeout(render, 220); }
+
+async function render(){
+  if(rendering){ queued=true; return; }
+  rendering=true; status('Rendering ...', true);
+  let r;
+  try { r = await fetch('/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({song:'pop',harmony,overrides:expand(values)})}); }
+  catch(e){ status('Error: '+e); rendering=false; if(queued){queued=false;go();} return; }
+  if(!r.ok){ status('Error: '+(await r.text())); rendering=false; if(queued){queued=false;go();} return; }
+  const t0=performance.now();
+  const blob=await r.blob(); const url=URL.createObjectURL(blob);
+  const chip=$('#chip'); chip.src=url;
+  $('#dl').href=url; $('#dl').download='chiptune.wav'; $('#dlBtn').disabled=false;
+  $('#stats').innerHTML=`<b>${(blob.size/1024).toFixed(0)} KB</b> wav · harmony: <b>${harmony}</b>`;
+  status('Ready.');
+  rendering=false; if(queued){queued=false;go();}
+}
+
+$('#hChords').onclick=()=>{harmony='chords'; $('#hChords').classList.add('on'); $('#hTrans').classList.remove('on'); render();};
+$('#hTrans').onclick=()=>{harmony='transcribe'; $('#hTrans').classList.add('on'); $('#hChords').classList.remove('on'); render();};
+
+build(); render();
+</script>
+</body>
+</html>

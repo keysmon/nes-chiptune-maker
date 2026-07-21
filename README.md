@@ -39,12 +39,21 @@ counts, and a time-resolved chroma similarity to the original.
 
 ## Web demo
 
-Upload a song, convert it, and tune the chiptune live in the browser:
+Two flavors:
+
+**Full app (local)** - upload *your own* song, convert it, and tune 26 controls live:
 
 ```bash
 .venv/bin/pip install -c constraints.txt -e ".[analysis,web,dev]"
 .venv/bin/python -m chiptune.web.app     # serves http://127.0.0.1:8100
 ```
+
+**Hosted playground (Vercel)** - `web-demo/`. The heavy analysis (Demucs +
+basic-pitch: GPU, big models, CoreML) can't run on serverless, so the hosted
+version ships *pre-analyzed* songs and runs only the light, deterministic
+synthesis half per request. You get the synthesis controls live plus the
+`chords` vs `transcribe` harmony A/B; live song upload stays in the local app.
+Deploy from `web-demo/` with `vercel deploy --prod`.
 
 Drop in an audio file (a 20-40 s clip works best). The server separates and
 transcribes it once (~10-40 s), then you tune 26 controls across 7 groups

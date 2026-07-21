@@ -1,0 +1,122 @@
+# NES 2A03 chiptune configuration.
+# Every value in this file is a taste knob. Nothing tasteful is hardcoded in Python.
+
+sample_rate = 44100
+frame_rate  = 60.0        # 2A03 frame clock; NTSC is really 60.0988
+noise_lowpass_hz = 4000   # roll off harsh/hissy highs on the drum (noise) channel; 0 = off
+output_highpass_hz = 30    # cut sub-sonic DC rumble on the final mix; 0 = off
+output_lowpass_hz  = 13000 # gentle top-end rolloff on the final mix, like real console output; 0 = off
+
+[arrange]
+subdivision              = 16     # quantize onsets to 1/16 notes
+quantize_strength        = 0.85   # 1.0 snaps hard and kills groove; 0.0 is a no-op
+min_duration             = 0.03   # seconds; floor so quantization can't zero a note
+arpeggio_frames          = 2      # frames per chord tone; lower = smoother fusion, higher = audible cycling
+bass_low                 = 28     # MIDI E1; fold bass below this up an octave
+bass_high                = 55     # MIDI G3; fold bass above this down an octave
+borrow_enabled           = false  # Phase 4 feature; role-locked until then
+borrow_idle_frames       = 30     # channel must be idle this long before it can be borrowed
+borrow_hysteresis_frames = 15     # delay before handing a borrowed channel back
+velocity_floor           = 0.35   # quietest note still plays at this fraction of channel volume; 1.0 = velocity ignored
+reattack_gap             = 0.02   # seconds; silence inserted before a repeated same-pitch lead/bass note so it re-attacks; 0 = off
+
+# Sparse arranger (chiptune.analysis.build_score): "chords" replaces basic-pitch
+# transcription of the "other" stem (hundreds of noisy overlapping notes) with a
+# clean chord-progression comp; "transcribe" reproduces the old note-soup path.
+harmony_mode                 = "chords"  # "chords" or "transcribe"
+chord_comp_pattern           = "up"      # "up" / "updown" / "root_fifth"; see arrange.chord_comp
+chord_subdivision            = 2         # comped notes per beat
+chord_octave                 = 4         # mid register (C4=60); sits with the melody, declash separates collisions
+chord_tones                  = 3         # chord tones per comp cycle (root/third/fifth)
+chord_smooth_beats           = 4         # mode-smoothing window (beats); higher = fewer, more stable chords (less jitter)
+melody_min_seconds           = 0.08      # drop LEAD notes shorter than this (thin_melody)
+bass_min_seconds             = 0.08      # drop BASS notes shorter than this (simplify_bass)
+harmony_rest_on_busy_melody  = false     # drop harmony notes that land on a melodic attack, giving the melody space
+
+# duty: 0.125 / 0.25 / 0.5 / 0.75 are the only values the real chip supports
+[pulse1]                          # lead
+duty = 0.5
+volume = 12
+attack_frames = 0
+decay_frames = 4
+sustain = 0.8
+release_frames = 3
+
+[pulse2]                          # harmony
+duty = 0.25
+volume = 8
+attack_frames = 0
+decay_frames = 6
+sustain = 0.7
+release_frames = 4
+
+[triangle]                        # bass. volume is fixed by hardware; see note below.
+duty = 0.0
+volume = 15
+attack_frames = 0
+decay_frames = 0
+sustain = 1.0
+release_frames = 0
+
+[vibrato]                         # lead (Pulse 1) pitch LFO on sustained notes; Pulse 2 and Triangle unaffected
+rate_hz         = 6.0    # LFO speed
+depth_semitones = 0.25   # peak pitch swing (0.25 semitone is a gentle chip vibrato)
+delay_frames    = 12     # frames a pitch must hold before vibrato kicks in (~0.2s at 60fps)
+enabled         = true
+
+[noise]                           # drums
+duty = 0.0
+volume = 10
+attack_frames = 0
+decay_frames = 2
+sustain = 0.0
+release_frames = 1
+
+# priority: when two hits land on the same frame the higher priority wins the one
+# noise channel. A lost kick is heard; a lost hi-hat is not - hence kick > snare > hat.
+[drums.kick]
+period_index = 14                 # was 10; higher index = lower-freq noise = a low boom, not bright hiss
+mode = "long"
+volume = 11                       # was 13; a touch quieter
+frames = 4
+priority = 3
+
+[drums.snare]
+period_index = 8                  # was 6 (period 128); 8 (period 202) is a touch less hissy
+mode = "long"
+volume = 9                        # was 12; the snare was the loud, bright high-freq element
+frames = 6
+priority = 2
+
+[drums.hat]
+period_index = 3                  # was 2 (period 16, very bright); 3 (period 32) is a bit less piercing
+mode = "long"
+volume = 4                        # was 6; modest trim (secondary to the snare, kept present not silent)
+frames = 2
+priority = 1
+
+# Relative channel trim applied before the non-linear mixer.
+[levels]
+pulse1 = 1.0
+pulse2 = 0.85
+triangle = 1.0
+noise = 0.6                        # was 0.7; drums sit back a little (they read as "a little loud")
+
+# Audio -> Score analysis taste knobs (Demucs separation, transcription, drum
+# classification). Nothing tasteful is hardcoded in Python here either.
+[analysis]
+include_vocals   = true    # false -> instrumental cover, lead taken from `other`
+vocal_fmin       = 80.0    # librosa.pyin search floor (Hz)
+vocal_fmax       = 1000.0
+min_note_seconds = 0.033   # drop transcribed notes shorter than this (seconds)
+# Drum classification by band-energy fraction (robust to hat/cymbal bleed in a
+# summed drum stem, where spectral centroid collapses the split). Thresholds
+# tuned on the real pop drum stem: low/high-frac percentiles gave a musically
+# plausible split of kick~46 / snare~48 / hat~29 across 123 onsets.
+kick_band_hz      = 150.0   # energy fraction below this band decides KICK
+hat_band_hz       = 6000.0  # energy fraction above this band decides HAT
+kick_low_frac_min = 0.5     # >= this fraction of energy below kick_band_hz -> KICK
+hat_high_frac_min = 0.15    # else >= this fraction above hat_band_hz -> HAT; else SNARE
+onset_backtrack  = true    # librosa onset backtracking to the local energy minimum
+harmony_declash  = true    # push a harmony note down an octave when it collides with the lead
+declash_semitones = 1      # "collides" = within this many semitones of a concurrent lead note

@@ -21,3 +21,7 @@ models/
 .DS_Store
 .idea/
 .superpowers/
+
+# Vercel deploy state (per-machine)
+web-demo/.vercel/
+**/__pycache__/
