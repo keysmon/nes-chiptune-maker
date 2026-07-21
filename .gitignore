@@ -17,6 +17,12 @@ out/
 renders/
 models/
 
+# Secrets - NEVER commit (repo is public). Keys live in a local .env only.
+.env
+.env.*
+*.key
+secrets.*
+
 # OS / IDE
 .DS_Store
 .idea/
