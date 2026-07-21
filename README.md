@@ -37,6 +37,33 @@ estimates the tempo, assembles a chip-agnostic `Score`, and renders it through
 the same NES synth `render` uses. It prints the estimated BPM, per-role note
 counts, and a time-resolved chroma similarity to the original.
 
+## AI arranger (experimental, opt-in)
+
+By default `convert` arranges the four voices with a deterministic heuristic.
+An optional AI mode instead asks a language model to arrange them: it sees the
+song's melody, tempo, and key, and writes a four-voice NES arrangement in
+mode-relative scale-degree notation, which code parses into the same `Score` and
+renders through the same synth.
+
+```bash
+.venv/bin/pip install -c constraints.txt -e ".[analysis,ai,dev]"
+export GROQ_API_KEY=...        # free key from https://console.groq.com
+.venv/bin/python -m chiptune.cli convert song.wav --ai -o out/song_ai.wav
+```
+
+The backend is any OpenAI-compatible endpoint, configured under `[ai]` in
+`config/nes.toml` (`base_url`, `model`, `api_key_env`, `temperature`,
+`max_tokens`) - Groq's free tier by default, or point it at a local Ollama
+server, OpenRouter, etc. without a code change. `--ai` is shorthand for
+`arrange_mode = "ai"`; setting that key in the config makes AI mode the default.
+
+It is designed never to fail loudly: any error (missing key, network, or output
+that will not parse) falls back to the heuristic arranger and logs why on stderr,
+so `--ai` never crashes and never produces silence. Because the model is
+non-deterministic, the arrangement is judged by ear against the heuristic - run
+the same song both ways and compare. Leaving `arrange_mode = "heuristic"` (the
+default) keeps the byte-for-byte deterministic path untouched.
+
 ## Web demo
 
 Two flavors:
@@ -78,6 +105,9 @@ Both halves complete and merged:
   staircase triangle, LFSR noise, non-linear mixer, hardware-invariant checks.
 - **Analysis half** (`convert`): audio -> `Score`. Demucs separation, basic-pitch /
   pyin / onset transcription, tempo estimation, config-gated harmony declash.
+- **AI arranger** (`convert --ai`, opt-in): an LLM arranges the four voices from the
+  song's melody/tempo/key over an OpenAI-compatible seam (Groq by default), with a
+  guaranteed fallback to the heuristic arranger on any failure. See "AI arranger" above.
 
 The two are joined by the serialized `Score`, so the slow ML analysis runs once and
 the fast, deterministic synthesis re-renders in seconds while you tune `config/nes.toml`.
