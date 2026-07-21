@@ -33,10 +33,12 @@ _CHROMA_HOP_LENGTH = 512  # librosa.feature.chroma_cqt's default; kept explicit 
 
 
 def _windowed_chroma(y: np.ndarray, sr: int) -> np.ndarray:
-    """Chroma, mean-pooled into `CHROMA_WINDOW_SECONDS`-long windows.
+    """Chroma, mean-pooled into windows of approximately `CHROMA_WINDOW_SECONDS`.
 
-    Returns an array of shape (n_windows, 12). A signal shorter than one
-    window collapses to a single window covering the whole signal.
+    `array_split` spreads the remainder across windows, so each window is at or
+    slightly under the nominal length rather than exactly it. Returns an array of
+    shape (n_windows, 12). A signal shorter than one window collapses to a single
+    window covering the whole signal.
     """
     if y.ndim > 1:
         y = y.mean(axis=1)
