@@ -10,7 +10,9 @@ content hash.
 from __future__ import annotations
 
 import hashlib
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -38,32 +40,35 @@ def _load_cache(cache_file: Path) -> dict[str, np.ndarray]:
         return {name: data[name] for name in STEM_NAMES}
 
 
-def _to_mono_f32(wav: torch.Tensor) -> np.ndarray:
-    """(channels, samples) torch tensor -> mono float32 numpy array."""
-    array = wav.detach().cpu().numpy()
-    mono = array.mean(axis=0) if array.ndim > 1 else array
-    return np.ascontiguousarray(mono.astype(np.float32))
+def _save_cache_atomic(cache_file: Path, stems: dict[str, np.ndarray]) -> None:
+    """Write the stem cache atomically.
 
-
-def separate_stems(audio_path: str | Path, cache_dir: Path | None = None) -> dict[str, np.ndarray]:
-    """Separate `audio_path` into drums/bass/other/vocals stems.
-
-    Each returned array is mono float32 at STEM_SR. Results are cached by
-    sha256(file bytes + model name) as a `.npz` under `cache_dir` (default
-    `cache/stems/`); a cache hit skips Demucs entirely.
+    A partial write must never occupy the final cache path: a separation killed
+    mid-write (Ctrl-C / OOM / disk-full) would otherwise leave a truncated
+    `.npz` that wedges the input forever. So write to a temp file in the SAME
+    directory (same filesystem, so the rename is atomic) then `os.replace` it
+    over the final path. `np.savez` is handed the open file object, not a path,
+    to avoid its habit of appending `.npz` to a bare temp name.
     """
-    audio_path = Path(audio_path)
-    if not audio_path.exists():
-        raise FileNotFoundError(f"audio file not found: {audio_path}")
+    fd, tmp_name = tempfile.mkstemp(dir=cache_file.parent, prefix=".stemtmp-", suffix=".npz")
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            np.savez(fh, **stems)
+        os.replace(tmp_path, cache_file)
+    except OSError as exc:
+        print(f"warning: failed to cache stems to {cache_file}: {exc}", file=sys.stderr)
+    finally:
+        # No-op after a successful replace; cleans the temp on any other path.
+        tmp_path.unlink(missing_ok=True)
 
-    cache_dir = Path(cache_dir) if cache_dir is not None else DEFAULT_CACHE_DIR
-    cache_dir.mkdir(parents=True, exist_ok=True)
 
-    digest = _content_hash(audio_path, MODEL_NAME)
-    cache_file = cache_dir / f"{digest}.npz"
-    if cache_file.exists():
-        return _load_cache(cache_file)
+def _separate_uncached(audio_path: Path) -> dict[str, np.ndarray]:
+    """Run Demucs on `audio_path`, returning mono float32 stems at STEM_SR.
 
+    The single seam that touches the model; kept separate from caching so the
+    cache logic is testable without a model load.
+    """
     try:
         import demucs.api
     except ImportError as exc:
@@ -97,11 +102,45 @@ def separate_stems(audio_path: str | Path, cache_dir: Path | None = None) -> dic
             f"got {sorted(separated)}"
         )
 
-    stems = {name: _to_mono_f32(separated[name]) for name in STEM_NAMES}
+    return {name: _to_mono_f32(separated[name]) for name in STEM_NAMES}
 
-    try:
-        np.savez(cache_file, **stems)
-    except OSError as exc:
-        print(f"warning: failed to cache stems to {cache_file}: {exc}", file=sys.stderr)
 
+def _to_mono_f32(wav: torch.Tensor) -> np.ndarray:
+    """(channels, samples) torch tensor -> mono float32 numpy array."""
+    array = wav.detach().cpu().numpy()
+    mono = array.mean(axis=0) if array.ndim > 1 else array
+    return np.ascontiguousarray(mono.astype(np.float32))
+
+
+def separate_stems(audio_path: str | Path, cache_dir: Path | None = None) -> dict[str, np.ndarray]:
+    """Separate `audio_path` into drums/bass/other/vocals stems.
+
+    Each returned array is mono float32 at STEM_SR. Results are cached by
+    sha256(file bytes + model name) as a `.npz` under `cache_dir` (default
+    `cache/stems/`); a cache hit skips Demucs entirely.
+    """
+    audio_path = Path(audio_path)
+    if not audio_path.exists():
+        raise FileNotFoundError(f"audio file not found: {audio_path}")
+
+    cache_dir = Path(cache_dir) if cache_dir is not None else DEFAULT_CACHE_DIR
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    digest = _content_hash(audio_path, MODEL_NAME)
+    cache_file = cache_dir / f"{digest}.npz"
+    if cache_file.exists():
+        try:
+            return _load_cache(cache_file)
+        except Exception as exc:  # noqa: BLE001 - "any load error" is intentional
+            # A truncated/corrupt cache (BadZipFile / EOFError / KeyError /
+            # ValueError / OSError) must self-heal, not wedge the input forever:
+            # treat it as a miss, warn, and re-separate + overwrite atomically.
+            print(
+                f"warning: stem cache {cache_file} is unreadable "
+                f"({type(exc).__name__}: {exc}); re-separating and overwriting",
+                file=sys.stderr,
+            )
+
+    stems = _separate_uncached(audio_path)
+    _save_cache_atomic(cache_file, stems)
     return stems
