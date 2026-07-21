@@ -24,17 +24,26 @@ def test_pulse_duty_must_be_a_real_chip_value():
 VALID_CHANNEL = "volume=12\nattack_frames=0\ndecay_frames=0\nsustain=1.0\nrelease_frames=0\n"
 
 
+VALID_ANALYSIS = (
+    "[analysis]\ninclude_vocals=true\nvocal_fmin=80.0\nvocal_fmax=1000.0\n"
+    "min_note_seconds=0.033\nkick_band_hz=150.0\nhat_band_hz=6000.0\n"
+    "kick_low_frac_min=0.5\nhat_high_frac_min=0.15\n"
+    "onset_backtrack=true\nharmony_declash=true\ndeclash_semitones=1\n"
+)
+
+
 def test_rejects_invalid_duty(tmp_path):
     bad = tmp_path / "bad.toml"
     bad.write_text(
         "sample_rate=44100\nframe_rate=60.0\n"
         "[arrange]\nsubdivision=16\nquantize_strength=1.0\nmin_duration=0.03\n"
         "arpeggio_frames=2\nbass_low=28\nbass_high=55\nborrow_enabled=false\n"
-        "borrow_idle_frames=30\nborrow_hysteresis_frames=15\n"
+        "borrow_idle_frames=30\nborrow_hysteresis_frames=15\nvelocity_floor=0.35\n"
         f"[pulse1]\nduty=0.33\n{VALID_CHANNEL}"
         f"[pulse2]\nduty=0.25\n{VALID_CHANNEL}"
         f"[triangle]\nduty=0.0\n{VALID_CHANNEL}"
         f"[noise]\nduty=0.0\n{VALID_CHANNEL}"
+        f"{VALID_ANALYSIS}"
     )
     with pytest.raises(ValueError, match="duty"):
         load_config(bad)

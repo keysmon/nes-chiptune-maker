@@ -68,12 +68,15 @@ class ArrangeConfig:
     borrow_enabled: bool
     borrow_idle_frames: int
     borrow_hysteresis_frames: int
+    velocity_floor: float
 
     def __post_init__(self) -> None:
         if self.bass_low >= self.bass_high:
             raise ValueError(f"bass_low {self.bass_low} must be below bass_high {self.bass_high}")
         if self.arpeggio_frames < 1:
             raise ValueError(f"arpeggio_frames must be >= 1, got {self.arpeggio_frames}")
+        if not 0.0 <= self.velocity_floor <= 1.0:
+            raise ValueError(f"velocity_floor must be in [0, 1], got {self.velocity_floor}")
 
 
 @dataclass(frozen=True)

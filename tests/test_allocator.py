@@ -114,6 +114,22 @@ def test_unplayable_lead_pitch_is_dropped_to_silence(cfg):
     assert all(f.pitch is None for f in tl.frames)
 
 
+def test_velocity_scales_pulse_volume(cfg):
+    soft = Score(TempoGrid(120., 0., 4), [NoteEvent(72, 0., 0.5, 30, Role.LEAD)], 1.0)
+    loud = Score(TempoGrid(120., 0., 4), [NoteEvent(72, 0., 0.5, 127, Role.LEAD)], 1.0)
+    vs = allocate(soft, cfg)[ChannelId.PULSE1].frames[5].volume
+    vl = allocate(loud, cfg)[ChannelId.PULSE1].frames[5].volume
+    assert vs < vl, "louder velocity must give higher volume"
+    assert vs > 0, "velocity_floor keeps soft notes audible"
+
+
+def test_triangle_ignores_velocity(cfg):
+    s = Score(TempoGrid(120., 0., 4),
+              [NoteEvent(36, 0., 0.5, 20, Role.BASS), NoteEvent(38, 0.5, 1.0, 127, Role.BASS)], 1.0)
+    vols = {f.volume for f in allocate(s, cfg)[ChannelId.TRIANGLE].frames if f.pitch is not None}
+    assert len(vols) == 1, "triangle volume must not vary with velocity (no hardware volume)"
+
+
 def test_dropped_unplayable_note_warns_to_stderr(cfg, capsys):
     """Dropping is correct, but - like midi_io's percussion warning - not silent.
 

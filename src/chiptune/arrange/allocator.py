@@ -54,20 +54,25 @@ def _monophonic(
     n_frames: int,
     frame_rate: float,
     pick_highest: bool,
-) -> list[int | None]:
-    """Reduce overlapping notes to one pitch per frame."""
-    chosen: list[int | None] = [None] * n_frames
+) -> list[NoteEvent | None]:
+    """Reduce overlapping notes to one winning note per frame.
+
+    Keeps the whole NoteEvent (not just the pitch) so callers can also read the
+    winning note's velocity - the loudest/highest-priority pitch and the
+    loudness that should drive the synth volume come from the same note.
+    """
+    chosen: list[NoteEvent | None] = [None] * n_frames
     for note in notes:
         for f in _frames_for(note, frame_rate):
             if f >= n_frames:
                 break
             current = chosen[f]
             if current is None:
-                chosen[f] = note.pitch
+                chosen[f] = note
             elif pick_highest:
-                chosen[f] = max(current, note.pitch)
+                chosen[f] = note if note.pitch > current.pitch else current
             else:
-                chosen[f] = min(current, note.pitch)
+                chosen[f] = note if note.pitch < current.pitch else current
     return chosen
 
 
@@ -83,25 +88,41 @@ def _envelope_volume(cfg_channel, frames_held: int, base_volume: int) -> int:
     return int(round(base_volume * level))
 
 
+def _scale_by_velocity(base_volume: int, velocity: int, floor: float) -> int:
+    """Scale a volume by note loudness, with `floor` keeping quiet notes audible.
+
+    velocity=127 (max) always reproduces base_volume exactly, regardless of
+    floor; velocity=0 gives base_volume * floor.
+    """
+    factor = floor + (1.0 - floor) * (velocity / 127.0)
+    return int(round(base_volume * factor))
+
+
 def _build_pitched_timeline(
     channel: ChannelId,
     pitches: list[int | None],
     cfg_channel,
     fixed_volume: bool,
+    velocity_floor: float,
+    velocities: list[int | None] | None = None,
 ) -> ChannelTimeline:
     frames: list[FrameEvent] = []
     held = 0
     prev: int | None = None
-    for p in pitches:
+    for i, p in enumerate(pitches):
         if p is None:
             frames.append(SILENT)
             held = 0
             prev = None
             continue
         held = held + 1 if p == prev else 0
-        # The triangle channel has no volume control; it is on or off.
-        vol = cfg_channel.volume if fixed_volume else _envelope_volume(
-            cfg_channel, held, cfg_channel.volume)
+        if fixed_volume:
+            # The triangle channel has no volume control; it is on or off.
+            vol = cfg_channel.volume
+        else:
+            vol = _envelope_volume(cfg_channel, held, cfg_channel.volume)
+            if velocities is not None:
+                vol = _scale_by_velocity(vol, velocities[i], velocity_floor)
         frames.append(FrameEvent(pitch=p, volume=max(0, min(15, vol))))
         prev = p
     return ChannelTimeline(channel=channel, frames=frames)
@@ -140,8 +161,12 @@ def allocate(score: Score, cfg: Config) -> dict[ChannelId, ChannelTimeline]:
     lead_notes = score.notes_with_role(Role.LEAD)
     lead = [nt for nt in lead_notes if playable_on_pulse(nt.pitch)]
     dropped_lead = [nt.pitch for nt in lead_notes if not playable_on_pulse(nt.pitch)]
-    lead_pitches = _monophonic(lead, n, fr, pick_highest=True)
-    pulse1 = _build_pitched_timeline(ChannelId.PULSE1, lead_pitches, cfg.pulse1, fixed_volume=False)
+    lead_winners = _monophonic(lead, n, fr, pick_highest=True)
+    lead_pitches = [w.pitch if w is not None else None for w in lead_winners]
+    lead_velocities = [w.velocity if w is not None else None for w in lead_winners]
+    pulse1 = _build_pitched_timeline(
+        ChannelId.PULSE1, lead_pitches, cfg.pulse1, fixed_volume=False,
+        velocity_floor=cfg.arrange.velocity_floor, velocities=lead_velocities)
 
     # --- Triangle: bass, lowest wins, folded into range ---
     bass_notes = score.notes_with_role(Role.BASS)
@@ -149,7 +174,8 @@ def allocate(score: Score, cfg: Config) -> dict[ChannelId, ChannelTimeline]:
     # normally lands every bass pitch in a playable range, so this is a safety net.
     dropped_bass = [nt.pitch for nt in bass_notes
                     if not playable_on_triangle(fold_into_range(nt.pitch, low, high))]
-    bass_pitches = _monophonic(bass_notes, n, fr, pick_highest=False)
+    bass_winners = _monophonic(bass_notes, n, fr, pick_highest=False)
+    bass_pitches = [w.pitch if w is not None else None for w in bass_winners]
     folded: list[int | None] = []
     for p in bass_pitches:
         if p is None:
@@ -157,22 +183,30 @@ def allocate(score: Score, cfg: Config) -> dict[ChannelId, ChannelTimeline]:
             continue
         q = fold_into_range(p, low, high)
         folded.append(q if playable_on_triangle(q) else None)
+    # No `velocities` passed: fixed_volume=True means the triangle build never
+    # reads them, so its "on or off" hardware constraint is untouched by velocity.
     triangle = _build_pitched_timeline(
-        ChannelId.TRIANGLE, folded, cfg.triangle, fixed_volume=True)
+        ChannelId.TRIANGLE, folded, cfg.triangle, fixed_volume=True,
+        velocity_floor=cfg.arrange.velocity_floor)
 
     # --- Pulse 2: harmony, arpeggiated ---
+    # Arpeggiation already re-strikes every chord tone every `arpeggio_frames`;
+    # threading velocity through it would mean changing arpeggiate()'s return
+    # type (and every existing caller of it), which is out of scope here. Pulse 2
+    # keeps its pre-existing envelope-only volume.
     harmony_notes = score.notes_with_role(Role.HARMONY)
     harmony = [nt for nt in harmony_notes if playable_on_pulse(nt.pitch)]
     dropped_harmony = [nt.pitch for nt in harmony_notes if not playable_on_pulse(nt.pitch)]
     harmony_pitches = arpeggiate(harmony, n, fr, cfg.arrange.arpeggio_frames)
     pulse2 = _build_pitched_timeline(
-        ChannelId.PULSE2, harmony_pitches, cfg.pulse2, fixed_volume=False)
+        ChannelId.PULSE2, harmony_pitches, cfg.pulse2, fixed_volume=False,
+        velocity_floor=cfg.arrange.velocity_floor)
 
     # --- Noise: percussion ---
     perc = score.notes_with_role(Role.PERCUSSION)
     noise = ChannelTimeline(
         channel=ChannelId.NOISE,
-        frames=allocate_percussion(perc, n, fr, cfg.drums),
+        frames=allocate_percussion(perc, n, fr, cfg.drums, velocity_floor=cfg.arrange.velocity_floor),
     )
 
     _warn_dropped({"lead": dropped_lead, "harmony": dropped_harmony, "bass": dropped_bass})

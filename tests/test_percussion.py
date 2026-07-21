@@ -13,8 +13,8 @@ PRIORITY_CASES = [
 ]
 
 
-def hit(kind, t, pitch=36):
-    return NoteEvent(pitch, t, t + 0.05, 100, Role.PERCUSSION, percussion=kind)
+def hit(kind, t, pitch=36, velocity=100):
+    return NoteEvent(pitch, t, t + 0.05, velocity, Role.PERCUSSION, percussion=kind)
 
 
 @pytest.fixture
@@ -47,6 +47,21 @@ def test_volume_comes_from_config(drums):
     assert frames[0].volume == drums["kick"].volume
 
 
+def test_velocity_floor_defaults_to_no_scaling(drums):
+    """Callers that don't opt into velocity_floor keep the pre-Task-1 behaviour."""
+    frames = allocate_percussion([hit(Percussion.KICK, 0.0, velocity=1)], 60, 60.0, drums)
+    assert frames[0].volume == drums["kick"].volume
+
+
+def test_percussion_volume_scales_with_velocity(drums):
+    soft = allocate_percussion(
+        [hit(Percussion.KICK, 0.0, velocity=20)], 60, 60.0, drums, velocity_floor=0.35)
+    loud = allocate_percussion(
+        [hit(Percussion.KICK, 0.0, velocity=127)], 60, 60.0, drums, velocity_floor=0.35)
+    assert soft[0].volume < loud[0].volume, "louder velocity must give higher volume"
+    assert soft[0].volume > 0, "velocity_floor keeps quiet hits audible"
+
+
 def test_allocator_now_fills_noise():
     cfg = load_config()
     s = Score(tempo=TempoGrid(120.0, 0.0, 4),
@@ -55,3 +70,15 @@ def test_allocator_now_fills_noise():
     tl = allocate(s, cfg)[ChannelId.NOISE]
     kinds = {f.percussion for f in tl.frames if f.percussion is not None}
     assert kinds == {Percussion.KICK, Percussion.SNARE}
+
+
+def test_allocator_scales_noise_volume_by_velocity():
+    """End-to-end: allocate() must thread [arrange].velocity_floor into the noise channel."""
+    cfg = load_config()
+    soft = Score(tempo=TempoGrid(120.0, 0.0, 4),
+                 notes=[hit(Percussion.KICK, 0.0, velocity=20)], duration=1.0)
+    loud = Score(tempo=TempoGrid(120.0, 0.0, 4),
+                 notes=[hit(Percussion.KICK, 0.0, velocity=127)], duration=1.0)
+    vs = allocate(soft, cfg)[ChannelId.NOISE].frames[0].volume
+    vl = allocate(loud, cfg)[ChannelId.NOISE].frames[0].volume
+    assert vs < vl, "louder velocity must give higher volume"

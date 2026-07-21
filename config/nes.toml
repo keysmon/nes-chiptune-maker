@@ -15,6 +15,7 @@ bass_high                = 55     # MIDI G3; fold bass above this down an octave
 borrow_enabled           = false  # Phase 4 feature; role-locked until then
 borrow_idle_frames       = 30     # channel must be idle this long before it can be borrowed
 borrow_hysteresis_frames = 15     # delay before handing a borrowed channel back
+velocity_floor           = 0.35   # quietest note still plays at this fraction of channel volume; 1.0 = velocity ignored
 
 # duty: 0.125 / 0.25 / 0.5 / 0.75 are the only values the real chip supports
 [pulse1]                          # lead
