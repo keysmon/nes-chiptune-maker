@@ -37,6 +37,23 @@ estimates the tempo, assembles a chip-agnostic `Score`, and renders it through
 the same NES synth `render` uses. It prints the estimated BPM, per-role note
 counts, and a time-resolved chroma similarity to the original.
 
+## Web demo
+
+Upload a song, convert it, and tune the chiptune live in the browser:
+
+```bash
+.venv/bin/pip install -c constraints.txt -e ".[analysis,web,dev]"
+.venv/bin/python -m chiptune.web.app     # serves http://127.0.0.1:8100
+```
+
+Drop in an audio file (a 20-40 s clip works best). The server separates and
+transcribes it once (~10-40 s), then you tune 26 controls across 7 groups
+(harmony, arrangement, feel, vibrato, levels, drums, output) and hear the result
+in ~0.25 s. Controls marked *re-analyzes* rebuild the arrangement (slower);
+everything else re-synthesizes instantly from the cached `Score` - the same seam
+that makes the CLI fast. This works because the slow ML analysis runs once and
+the deterministic synthesis is cheap to repeat.
+
 ## Tuning the sound
 
 Every taste-sensitive value lives in `config/nes.toml`: arpeggio rate, duty

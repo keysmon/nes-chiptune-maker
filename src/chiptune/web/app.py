@@ -10,6 +10,7 @@ import json
 import tempfile
 from pathlib import Path
 
+import soundfile as sf
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -57,14 +58,24 @@ def get_schema():
 
 @app.post("/api/upload")
 async def upload(file: UploadFile):
-    data = await file.read()
+    # Read in bounded chunks and stop at the cap, so an oversized POST can't spool
+    # gigabytes into memory before we reject it.
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1 << 20)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, f"file too large (max {MAX_UPLOAD_BYTES // (1024*1024)} MB)")
+        chunks.append(chunk)
+    data = b"".join(chunks)
     if not data:
         raise HTTPException(400, "empty upload")
-    if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(413, f"file too large (max {MAX_UPLOAD_BYTES // (1024*1024)} MB)")
     try:
         sess = store.create(file.filename or "upload.wav", data)
-    except Exception as exc:  # soundfile can't read it
+    except sf.SoundFileError as exc:  # not decodable audio
         raise HTTPException(400, f"could not read audio: {exc}")
     return {
         "session_id": sess.session_id,
@@ -87,7 +98,7 @@ def render(req: RenderRequest):
         wav, stats = store.render(req.session_id, expand_paths(req.overrides))
     except KeyError:
         raise HTTPException(404, "unknown session")
-    except ValueError as exc:  # invalid config value
+    except (ValueError, TypeError) as exc:  # invalid / unknown config value
         raise HTTPException(400, str(exc))
     return Response(
         content=wav,

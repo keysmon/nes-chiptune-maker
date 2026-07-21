@@ -30,13 +30,24 @@ from ..score import Score
 from ..synth.apu import render_channels
 from ..synth.mixer import apply_output_filter, nes_mix
 
-# Config values that change the SCORE (analysis half). Everything else is synthesis
-# and re-renders from a cached Score without re-analyzing.
+# [arrange] keys that change the SCORE (analysis half) - a change to any of these
+# rebuilds the Score. Every OTHER [arrange] key is synthesis-only (fast re-render).
 _ANALYSIS_ARRANGE_KEYS = frozenset({
     "harmony_mode", "chord_comp_pattern", "chord_subdivision", "chord_octave",
     "chord_tones", "chord_smooth_beats", "melody_min_seconds", "bass_min_seconds",
     "harmony_rest_on_busy_melody",
 })
+# [arrange] keys consumed only by quantize/allocate/synth (a change re-renders from
+# the cached Score). Kept explicit + partition-tested against ArrangeConfig so that
+# adding a new [arrange] field forces a conscious analysis-vs-synthesis choice
+# rather than silently defaulting to "synthesis" and skipping a needed re-analyze.
+_SYNTHESIS_ARRANGE_KEYS = frozenset({
+    "subdivision", "quantize_strength", "min_duration", "arpeggio_frames",
+    "bass_low", "bass_high", "borrow_enabled", "borrow_idle_frames",
+    "borrow_hysteresis_frames", "velocity_floor", "reattack_gap",
+})
+
+_MAX_SESSIONS = 32  # cap in-memory sessions + temp files (LRU-evict the oldest)
 
 
 def _analysis_signature(cfg: Config) -> str:
@@ -97,11 +108,22 @@ class SessionStore:
         ext = Path(filename).suffix.lower() or ".wav"
         audio_path = self.work_dir / f"{sid}{ext}"
         audio_path.write_bytes(data)
-        y, sr = sf.read(str(audio_path))
+        try:
+            y, sr = sf.read(str(audio_path))
+        except sf.SoundFileError:
+            audio_path.unlink(missing_ok=True)
+            raise  # app layer maps to 400
         dur = len(y) / sr
         sess = Session(session_id=sid, audio_path=audio_path, duration=round(dur, 2))
         self._sessions[sid] = sess
+        self._evict_if_needed()
         return sess
+
+    def _evict_if_needed(self) -> None:
+        while len(self._sessions) > _MAX_SESSIONS:
+            old_sid, old = next(iter(self._sessions.items()))
+            self._sessions.pop(old_sid, None)
+            old.audio_path.unlink(missing_ok=True)
 
     def get(self, sid: str) -> Session | None:
         return self._sessions.get(sid)

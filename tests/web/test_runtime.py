@@ -34,3 +34,17 @@ def test_schema_controls_have_valid_paths_and_defaults():
     for c in schema_with_defaults():
         assert c["default"] is not None, f"{c['path']} has no default"
         assert c["type"] in ("range", "toggle", "choice")
+
+
+def test_every_arrange_field_is_classified_analysis_or_synthesis():
+    """Guard: adding an [arrange] field forces classifying it as Score-affecting or
+    synthesis-only, so a new harmony/arrangement knob can't silently skip re-analyze."""
+    from dataclasses import fields
+    from chiptune.config import ArrangeConfig
+    from chiptune.web.runtime import _ANALYSIS_ARRANGE_KEYS, _SYNTHESIS_ARRANGE_KEYS
+    all_fields = {f.name for f in fields(ArrangeConfig)}
+    classified = _ANALYSIS_ARRANGE_KEYS | _SYNTHESIS_ARRANGE_KEYS
+    assert all_fields == classified, (
+        f"unclassified arrange fields: {all_fields ^ classified} - add each to "
+        "_ANALYSIS_ARRANGE_KEYS or _SYNTHESIS_ARRANGE_KEYS in web/runtime.py"
+    )

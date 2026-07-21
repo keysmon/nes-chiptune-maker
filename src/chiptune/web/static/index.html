@@ -153,8 +153,8 @@ async function render(initial){
   let r;
   try { r = await fetch('/api/render', {method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({session_id: SESSION, overrides: values})}); }
-  catch(e){ status('Render failed: ' + e); rendering=false; return; }
-  if(!r.ok){ status('Render error: ' + (await r.text())); rendering=false; return; }
+  catch(e){ status('Render failed: ' + e); rendering=false; if(queued){queued=false;scheduleRender();} return; }
+  if(!r.ok){ status('Render error: ' + (await r.text())); rendering=false; if(queued){queued=false;scheduleRender();} return; }
   const stats = JSON.parse(r.headers.get('X-Chiptune-Stats') || '{}');
   const blob = await r.blob();
   const url = URL.createObjectURL(blob);
