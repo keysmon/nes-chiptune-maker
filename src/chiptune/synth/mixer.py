@@ -27,6 +27,7 @@ from pathlib import Path
 
 import numpy as np
 import soundfile as sf
+from scipy.signal import butter, sosfiltfilt
 
 
 def _compress(signal: np.ndarray, numerator: float, divisor_k: float) -> np.ndarray:
@@ -40,7 +41,10 @@ def _compress(signal: np.ndarray, numerator: float, divisor_k: float) -> np.ndar
     channel). For non-negative input it is identical to ``np.where(x > 0, ..., 0)``.
     """
     mag = np.abs(signal)
-    with np.errstate(divide="ignore", invalid="ignore"):
+    # over: a tiny-but-nonzero |signal| makes divisor_k/mag overflow to inf, then
+    # numerator/inf -> 0.0, which the outer np.where discards anyway. All three are
+    # the correct limits, so silence the cosmetic warnings.
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
         compressed = np.where(
             mag > 0.0,
             numerator / (divisor_k / np.where(mag > 0.0, mag, 1.0) + 100.0),
@@ -72,6 +76,37 @@ def nes_mix(
     tnd_out = _compress(triangle / 8227.0 + noise / 12241.0, 159.79, 1.0)  # dmc / 22638 == 0
 
     return pulse_out + tnd_out
+
+
+def apply_output_filter(
+    signal: np.ndarray,
+    sample_rate: int,
+    highpass_hz: float = 0.0,
+    lowpass_hz: float = 0.0,
+) -> np.ndarray:
+    """Gentle output-stage filtering on the final mixed signal.
+
+    A real console's output stage was not flat: it cut sub-sonic DC rumble and
+    rolled off the extreme top end. Raw ``nes_mix`` output is brighter/hotter
+    than that, so this filters the finished mix to match - a high-pass at
+    `highpass_hz` and a low-pass at `lowpass_hz`, kept gentle (2nd-order,
+    zero-phase via sosfiltfilt) so the melody is not dulled. Same technique as
+    the noise-channel low-pass in apu.py, for the same reason: filtfilt keeps
+    transient timing exact since it does not shift phase.
+
+    Either stage is skipped when its cutoff is 0 or outside the valid
+    (0, Nyquist) range, so a cutoff of 0 disables that stage.
+    """
+    out = signal
+    nyquist = sample_rate / 2.0
+    if out.any():
+        if 0 < highpass_hz < nyquist:
+            sos = butter(2, highpass_hz, btype="high", fs=sample_rate, output="sos")
+            out = sosfiltfilt(sos, out)
+        if 0 < lowpass_hz < nyquist:
+            sos = butter(2, lowpass_hz, btype="low", fs=sample_rate, output="sos")
+            out = sosfiltfilt(sos, out)
+    return out
 
 
 def write_wav(path: str | Path, samples: np.ndarray, sample_rate: int) -> None:

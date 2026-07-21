@@ -4,6 +4,8 @@
 sample_rate = 44100
 frame_rate  = 60.0        # 2A03 frame clock; NTSC is really 60.0988
 noise_lowpass_hz = 4000   # roll off harsh/hissy highs on the drum (noise) channel; 0 = off
+output_highpass_hz = 30    # cut sub-sonic DC rumble on the final mix; 0 = off
+output_lowpass_hz  = 13000 # gentle top-end rolloff on the final mix, like real console output; 0 = off
 
 [arrange]
 subdivision              = 16     # quantize onsets to 1/16 notes
@@ -15,6 +17,8 @@ bass_high                = 55     # MIDI G3; fold bass above this down an octave
 borrow_enabled           = false  # Phase 4 feature; role-locked until then
 borrow_idle_frames       = 30     # channel must be idle this long before it can be borrowed
 borrow_hysteresis_frames = 15     # delay before handing a borrowed channel back
+velocity_floor           = 0.35   # quietest note still plays at this fraction of channel volume; 1.0 = velocity ignored
+reattack_gap             = 0.02   # seconds; silence inserted before a repeated same-pitch lead/bass note so it re-attacks; 0 = off
 
 # duty: 0.125 / 0.25 / 0.5 / 0.75 are the only values the real chip supports
 [pulse1]                          # lead
@@ -40,6 +44,12 @@ attack_frames = 0
 decay_frames = 0
 sustain = 1.0
 release_frames = 0
+
+[vibrato]                         # lead (Pulse 1) pitch LFO on sustained notes; Pulse 2 and Triangle unaffected
+rate_hz         = 6.0    # LFO speed
+depth_semitones = 0.25   # peak pitch swing (0.25 semitone is a gentle chip vibrato)
+delay_frames    = 12     # frames a pitch must hold before vibrato kicks in (~0.2s at 60fps)
+enabled         = true
 
 [noise]                           # drums
 duty = 0.0

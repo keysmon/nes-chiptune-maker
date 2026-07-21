@@ -68,12 +68,34 @@ class ArrangeConfig:
     borrow_enabled: bool
     borrow_idle_frames: int
     borrow_hysteresis_frames: int
+    velocity_floor: float
+    reattack_gap: float
 
     def __post_init__(self) -> None:
         if self.bass_low >= self.bass_high:
             raise ValueError(f"bass_low {self.bass_low} must be below bass_high {self.bass_high}")
         if self.arpeggio_frames < 1:
             raise ValueError(f"arpeggio_frames must be >= 1, got {self.arpeggio_frames}")
+        if not 0.0 <= self.velocity_floor <= 1.0:
+            raise ValueError(f"velocity_floor must be in [0, 1], got {self.velocity_floor}")
+        if self.reattack_gap < 0:
+            raise ValueError(f"reattack_gap must be >= 0, got {self.reattack_gap}")
+
+
+@dataclass(frozen=True)
+class VibratoConfig:
+    rate_hz: float
+    depth_semitones: float
+    delay_frames: int
+    enabled: bool
+
+    def __post_init__(self) -> None:
+        if self.rate_hz < 0:
+            raise ValueError(f"rate_hz must be >= 0, got {self.rate_hz}")
+        if self.depth_semitones < 0:
+            raise ValueError(f"depth_semitones must be >= 0, got {self.depth_semitones}")
+        if self.delay_frames < 0:
+            raise ValueError(f"delay_frames must be >= 0, got {self.delay_frames}")
 
 
 @dataclass(frozen=True)
@@ -140,7 +162,10 @@ class Config:
     triangle: ChannelConfig
     noise: ChannelConfig
     analysis: AnalysisConfig
+    vibrato: VibratoConfig
     noise_lowpass_hz: float = 0.0  # low-pass the noise channel to tame harsh/hissy drums; 0 = off
+    output_highpass_hz: float = 0.0  # sub-sonic rumble cut on the final mix; 0 = off
+    output_lowpass_hz: float = 0.0   # gentle top-end rolloff on the final mix; 0 = off
     drums: dict[str, DrumVoice] = field(default_factory=dict)
     levels: dict[str, float] = field(default_factory=dict)
 
@@ -188,6 +213,9 @@ def load_config(path: str | Path | None = None) -> Config:
             f"analysis must be one of {sorted(VALID_ANALYSIS_KEYS)}"
         )
 
+    if "vibrato" not in raw:
+        raise ValueError(f"config {path} is missing required [vibrato] section")
+
     return Config(
         sample_rate=raw["sample_rate"],
         frame_rate=raw["frame_rate"],
@@ -197,7 +225,10 @@ def load_config(path: str | Path | None = None) -> Config:
         triangle=channel("triangle", ChannelConfig),
         noise=channel("noise", ChannelConfig),
         analysis=AnalysisConfig(**raw_analysis),
+        vibrato=VibratoConfig(**raw["vibrato"]),
         noise_lowpass_hz=raw.get("noise_lowpass_hz", 0.0),
+        output_highpass_hz=raw.get("output_highpass_hz", 0.0),
+        output_lowpass_hz=raw.get("output_lowpass_hz", 0.0),
         drums=drums,
         levels=raw_levels,
     )

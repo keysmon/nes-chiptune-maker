@@ -19,7 +19,14 @@ def allocate_percussion(
     n_frames: int,
     frame_rate: float,
     drums: dict[str, DrumVoice],
+    velocity_floor: float = 1.0,
 ) -> list[FrameEvent]:
+    """`velocity_floor` mirrors the pitched channels' velocity scaling.
+
+    Defaults to 1.0 (mathematically a no-op: volume == config volume regardless
+    of velocity) rather than reading [arrange] here, so existing/direct callers
+    that don't pass it keep the pre-velocity-dynamics behaviour unchanged.
+    """
     missing = {n.percussion.value for n in notes if n.percussion} - set(drums)
     if missing:
         raise ValueError(f"config has no [drums.{sorted(missing)[0]}] section")
@@ -31,6 +38,8 @@ def allocate_percussion(
         if note.percussion is None:
             raise ValueError("percussion notes must carry a `percussion` kind")
         voice = drums[note.percussion.value]
+        factor = velocity_floor + (1.0 - velocity_floor) * (note.velocity / 127.0)
+        volume = max(0, min(15, int(round(voice.volume * factor))))
         start = int(math.floor(note.start * frame_rate))
         for i in range(voice.frames):
             f = start + i
@@ -40,6 +49,6 @@ def allocate_percussion(
             if existing is None or voice.priority > drums[existing.value].priority:
                 winners[f] = note.percussion
                 frames[f] = FrameEvent(
-                    pitch=None, volume=voice.volume, percussion=note.percussion)
+                    pitch=None, volume=volume, percussion=note.percussion)
 
     return frames

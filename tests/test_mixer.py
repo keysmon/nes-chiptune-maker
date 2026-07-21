@@ -66,6 +66,22 @@ def test_length_mismatch_is_an_error():
         nes_mix(const(1, 100), const(1, 50), const(1, 100), const(1, 100))
 
 
+def test_output_filter_rolls_off_extremes():
+    from chiptune.synth.mixer import apply_output_filter
+    sr = 44100
+    t = np.arange(sr) / sr
+    sig = (np.sin(2 * np.pi * 20 * t) + np.sin(2 * np.pi * 2000 * t) + np.sin(2 * np.pi * 18000 * t)).astype(float)
+    out = apply_output_filter(sig, sr, highpass_hz=30, lowpass_hz=13000)
+
+    def amp(x, f):
+        spec = np.abs(np.fft.rfft(x))
+        fr = np.fft.rfftfreq(len(x), 1 / sr)
+        return spec[np.argmin(np.abs(fr - f))]
+
+    assert amp(out, 20) < 0.5 * amp(out, 2000), "sub-30Hz should be attenuated"
+    assert amp(out, 18000) < 0.5 * amp(out, 2000), "18kHz should be attenuated"
+
+
 def test_write_wav_round_trips(tmp_path):
     import soundfile as sf
     path = tmp_path / "out.wav"
