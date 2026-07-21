@@ -17,6 +17,12 @@ from ..score import NoteEvent, Role, TempoGrid
 from ..analysis.chords import ChordSegment
 
 _HARMONY_VELOCITY = 80
+# A comped note this short or shorter is dropped rather than emitted: when a
+# segment's duration isn't an exact multiple of `step`, the last note in the
+# segment is a near-zero-length remainder, not a musical note - and NoteEvent
+# happily accepts it (end > start is all it requires), so it would otherwise
+# reach the pipeline as a degenerate blip.
+_MIN_COMP_NOTE_SECONDS = 0.01
 
 
 def _chord_tones(base_pitch: int, third_interval: int, tones: int) -> list[int]:
@@ -83,15 +89,16 @@ def comp_chords(
         i = 0
         while t < seg.end:
             note_end = min(t + step, seg.end)
-            notes.append(
-                NoteEvent(
-                    pitch=sequence[i % len(sequence)],
-                    start=t,
-                    end=note_end,
-                    velocity=_HARMONY_VELOCITY,
-                    role=Role.HARMONY,
+            if note_end - t >= _MIN_COMP_NOTE_SECONDS:
+                notes.append(
+                    NoteEvent(
+                        pitch=sequence[i % len(sequence)],
+                        start=t,
+                        end=note_end,
+                        velocity=_HARMONY_VELOCITY,
+                        role=Role.HARMONY,
+                    )
                 )
-            )
             t = note_end
             i += 1
 

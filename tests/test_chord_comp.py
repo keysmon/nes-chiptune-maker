@@ -48,3 +48,18 @@ def test_minor_chord_uses_minor_third():
     notes = comp_chords([seg], pattern="up", subdivision=3, octave=4, tones=3, grid=grid)
 
     assert [n.pitch for n in notes] == [69, 72, 76]
+
+
+def test_drops_degenerate_tail_note_shorter_than_minimum():
+    # bpm=120 -> seconds_per_beat=0.5; subdivision=1 -> step=0.5. A segment
+    # 0.505s long (not a multiple of the step) leaves a 5ms tail note after
+    # the one full-length note - that tail must be dropped, not emitted.
+    grid = _grid()
+    seg = ChordSegment(start=0.0, end=0.505, root=0, is_minor=False)
+
+    notes = comp_chords([seg], pattern="up", subdivision=1, octave=4, tones=3, grid=grid)
+
+    assert len(notes) == 1
+    assert notes[0].start == 0.0
+    assert notes[0].end == 0.5
+    assert all(n.duration >= 0.01 for n in notes)
