@@ -55,6 +55,14 @@ def test_nonfinite_durations_are_dropped_not_raised(bad):
     notes = [n for n in parse_arrangement(text, GRID, OCT) if n.role is Role.LEAD]
     assert [n.pitch for n in notes] == [60]  # bad-duration token dropped, 1:1 survives
 
+def test_absurd_finite_duration_is_dropped_not_rendered():
+    # A finite-but-enormous duration clears the isfinite guard but would size the
+    # render buffer to gigabytes and OOM the synth OUTSIDE the fallback. Must drop.
+    text = "KEY: C maj\nLEAD: 1:100000 5:1"
+    notes = [n for n in parse_arrangement(text, GRID, OCT) if n.role is Role.LEAD]
+    assert [n.pitch for n in notes] == [67]      # 1:100000 dropped, 5:1 (G4) survives
+    assert all(n.end <= 600.0 for n in notes)    # nothing beyond the safety rail reaches the synth
+
 def test_harmony_voice_maps_to_harmony_role():
     text = "KEY: C maj\nHARM: 1:1 3:1"
     notes = [n for n in parse_arrangement(text, GRID, OCT) if n.role is Role.HARMONY]

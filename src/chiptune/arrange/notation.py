@@ -14,6 +14,11 @@ from ..score import NoteEvent, Percussion, Role, TempoGrid
 
 _MAJOR = [0, 2, 4, 5, 7, 9, 11]
 _MINOR = [0, 2, 3, 5, 7, 8, 10]
+# Render-buffer safety rail: 10 min is far beyond any real song, so this never
+# truncates legitimate music - it only stops a pathological finite-but-enormous
+# LLM duration (e.g. "1:100000") from sizing the synth buffer to gigabytes and
+# OOM-crashing the render OUTSIDE the arranger's fallback. Not a musical knob.
+_MAX_ARRANGEMENT_SECONDS = 600.0
 _ROOTS = {"C":0,"C#":1,"DB":1,"D":2,"D#":3,"EB":3,"E":4,"F":5,"F#":6,"GB":6,
           "G":7,"G#":8,"AB":8,"A":9,"A#":10,"BB":10,"B":11}
 _VOICE_ROLE = {"LEAD": Role.LEAD, "HARM": Role.HARMONY, "BASS": Role.BASS, "DRUMS": Role.PERCUSSION}
@@ -87,6 +92,11 @@ def parse_arrangement(text: str, grid: TempoGrid, octaves: dict[str, int]) -> li
                 dropped += 1
                 continue
             end = t + dur * spb
+            if end > _MAX_ARRANGEMENT_SECONDS:
+                # Finite but absurd (e.g. "1:100000"): would OOM the render buffer
+                # outside the fallback. Drop without advancing t (bounds total length).
+                dropped += 1
+                continue
             if role is Role.PERCUSSION:
                 if sym.upper() != "R":
                     for ch in sym.upper():

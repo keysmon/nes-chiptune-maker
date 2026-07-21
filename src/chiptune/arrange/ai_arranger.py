@@ -9,7 +9,7 @@ import sys
 from typing import Callable
 
 from ..config import AIConfig
-from ..score import NoteEvent, Role, Score, TempoGrid
+from ..score import Role, Score
 from .notation import NotationError, parse_arrangement
 
 _DEFAULT_OCTAVES = {"LEAD": 4, "HARM": 3, "BASS": 2}
