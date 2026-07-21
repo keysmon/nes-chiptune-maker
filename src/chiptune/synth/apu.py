@@ -17,7 +17,7 @@ import numpy as np
 from scipy.signal import butter, sosfiltfilt
 
 from ..arrange.timeline import ChannelId, ChannelTimeline
-from ..config import Config
+from ..config import Config, VibratoConfig
 from ..nes.tables import (
     midi_to_hz,
     pulse_period,
@@ -47,6 +47,21 @@ def _quantized_triangle_hz(pitch: int) -> float:
     period register, so its pitch must carry the same chip quantization the pulses do
     rather than sound at the ideal frequency."""
     return triangle_period_to_hz(triangle_period(midi_to_hz(pitch)))
+
+
+def _vibrato_multiplier(note_age_frames: int, frame_rate: float, vib: VibratoConfig) -> float:
+    """Sinusoidal pitch LFO multiplier for the lead voice.
+
+    `note_age_frames` counts frames since the current pitch was struck (0 on the
+    onset frame), so the LFO phase is derived from absolute time since the delay
+    elapsed rather than reset each frame - that is what keeps it phase-continuous
+    across frame boundaries instead of clicking back to zero every render call.
+    """
+    if not vib.enabled or note_age_frames < vib.delay_frames:
+        return 1.0
+    t = (note_age_frames - vib.delay_frames) / frame_rate
+    lfo = np.sin(2.0 * np.pi * vib.rate_hz * t)
+    return 2.0 ** (vib.depth_semitones * lfo / 12.0)
 
 
 # A drum hit is not a flat gate of noise: real percussion is a fast attack followed
@@ -97,6 +112,8 @@ def render_channels(
     for ch in (ChannelId.PULSE1, ChannelId.PULSE2):
         duty = channel_cfg[ch].duty
         buf = out[ch]
+        prev_pitch: int | None = None
+        note_age = 0  # frames the current pitch has been held; reset on change/silence
         for f, ev in enumerate(timelines[ch].frames):
             a, b = _frame_sample_bounds(f, sr, fr)
             if b > total:
@@ -104,8 +121,19 @@ def render_channels(
             if a >= b:
                 continue
             if ev.pitch is None:
+                prev_pitch = None
+                note_age = 0
                 continue
+            if ev.pitch == prev_pitch:
+                note_age += 1
+            else:
+                prev_pitch = ev.pitch
+                note_age = 0
             hz = _quantized_pulse_hz(ev.pitch)
+            if ch is ChannelId.PULSE1:
+                # Lead-only vibrato. Pulse 2 is arpeggiated - modulating it on top
+                # of the arpeggio would read as detuned rather than expressive.
+                hz *= _vibrato_multiplier(note_age, fr, cfg.vibrato)
             wave, phases[ch] = bank.render(hz, duty, b - a, phases[ch])
             buf[a:b] = wave * ev.volume        # 0-15 DAC range
 

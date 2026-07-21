@@ -121,6 +121,23 @@ def test_triangle_fundamental_is_period_quantized(cfg):
     assert _fft_peak_hz(sig, cfg.sample_rate) == pytest.approx(quant, abs=2.0)
 
 
+def test_vibrato_modulates_a_sustained_lead(cfg):
+    # a long held note should show sidebands / frequency spread vs a vibrato-off render
+    import dataclasses
+    s = Score(TempoGrid(120., 0., 4), [NoteEvent(69, 0.0, 2.0, 100, Role.LEAD)], 2.0)  # A4 held 2s
+    on = render(s, cfg)[ChannelId.PULSE1]
+    off = render(s, dataclasses.replace(cfg, vibrato=dataclasses.replace(cfg.vibrato, enabled=False)))[ChannelId.PULSE1]
+
+    def spread(x):
+        spec = np.abs(np.fft.rfft(x * np.hanning(len(x))))
+        f = np.fft.rfftfreq(len(x), 1 / cfg.sample_rate)
+        peak = f[np.argmax(spec)]
+        band = (f > peak * 0.98) & (f < peak * 1.02)
+        return spec[band].sum() / spec.max()
+
+    assert spread(on) > spread(off), "vibrato should widen the fundamental"
+
+
 def test_triangle_renders_at_quantized_not_ideal_frequency(cfg):
     """Regression guard for the period-register quantization.
 
