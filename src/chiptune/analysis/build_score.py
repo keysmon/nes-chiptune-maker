@@ -170,7 +170,7 @@ def build_score(audio_path, cfg: Config, cache_dir=None) -> Score:
         notes = declashed
 
     duration = max((n.end for n in notes), default=0.0)
-    score = Score(tempo=grid, notes=notes, duration=duration)
+    heuristic_score = Score(tempo=grid, notes=notes, duration=duration)
 
     counts = {r: sum(1 for n in notes if n.role is r) for r in Role}
     print(
@@ -180,7 +180,7 @@ def build_score(audio_path, cfg: Config, cache_dir=None) -> Score:
         f"declash_pushed={declash_pushed}",
         file=sys.stderr,
     )
-    density = score_density(score, frame_rate=cfg.frame_rate)
+    density = score_density(heuristic_score, frame_rate=cfg.frame_rate)
     print(
         f"chiptune.analysis.build_score: density mean_simultaneous="
         f"{density['mean_simultaneous']:.2f} lead_active={density['per_role_active'][Role.LEAD]:.2f} "
@@ -188,4 +188,11 @@ def build_score(audio_path, cfg: Config, cache_dir=None) -> Score:
         f"bass_active={density['per_role_active'][Role.BASS]:.2f}",
         file=sys.stderr,
     )
-    return score
+
+    # "ai" = hand the heuristic Score (melody/tempo source AND fallback) to the
+    # LLM arranger; "heuristic" (default) leaves existing behavior unchanged.
+    if arr.arrange_mode == "ai":
+        from chiptune.arrange.ai_arranger import arrange as ai_arrange
+
+        return ai_arrange(heuristic_score, cfg.ai, None, lambda: heuristic_score)
+    return heuristic_score

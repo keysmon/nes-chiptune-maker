@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -89,6 +90,10 @@ def main(argv: list[str] | None = None) -> int:
     convert.add_argument("input", help="path to an audio file (wav/mp3/flac/...)")
     convert.add_argument("-o", "--output", default="out/chiptune.wav")
     convert.add_argument("-c", "--config", default=None, help="path to a nes.toml")
+    convert.add_argument(
+        "--ai", action="store_true",
+        help="use the LLM arranger instead of the heuristic one (needs [ai].api_key_env set)",
+    )
 
     args = parser.parse_args(argv)
 
@@ -117,6 +122,8 @@ def main(argv: list[str] | None = None) -> int:
         except FileNotFoundError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
+        if args.ai:
+            cfg = replace(cfg, arrange=replace(cfg.arrange, arrange_mode="ai"))
         if not Path(args.input).exists():
             print(f"error: audio file not found: {args.input}", file=sys.stderr)
             return 2

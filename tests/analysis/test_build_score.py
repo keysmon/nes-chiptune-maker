@@ -252,3 +252,63 @@ def test_declash_guards_octave_underflow():
     out = declash_harmony([_n(6, 0.0, 1.0, Role.LEAD), _n(6, 0.0, 1.0, Role.HARMONY)], 1)
     harm = [n for n in out if n.role is Role.HARMONY][0]
     assert harm.pitch == 6
+
+
+def test_ai_mode_uses_llm_arrangement(monkeypatch, tmp_path):
+    """arrange_mode='ai': the heuristic Score is still built first (it's the
+    fallback + melody/tempo source), then handed to ai_arranger.arrange, whose
+    (mocked) LLM output replaces it wholesale."""
+    from chiptune.arrange import ai_arranger
+
+    audio = tmp_path / "song.wav"
+    _tiny_song(audio)
+    _patch_common(monkeypatch)
+
+    def fake_pitched(stem, sr, role, min_duration=0.0):
+        pitch = 33 if role is Role.BASS else 48
+        return [NoteEvent(pitch, 0.0, 0.4, 64, role)]
+
+    monkeypatch.setattr(bs, "transcribe_pitched", fake_pitched)
+    monkeypatch.setattr(
+        bs, "transcribe_vocals",
+        lambda stem, sr, fmin, fmax, min_duration=0.06: [NoteEvent(67, 0.0, 0.5, 80, Role.LEAD)],
+    )
+    monkeypatch.setattr(
+        ai_arranger, "_call_llm",
+        lambda prompt, cfg: "KEY: C maj\nLEAD: 1:1 3:1\nBASS: 1:2\nDRUMS: K:1 S:1",
+    )
+
+    cfg = load_config()
+    cfg = replace(cfg, arrange=replace(cfg.arrange, harmony_mode="transcribe", arrange_mode="ai"))
+    score = build_score(audio, cfg)
+
+    assert any(n.role is Role.BASS for n in score.notes)
+    # the AI-parsed arrangement replaces the heuristic notes wholesale: the
+    # heuristic vocal pitch (67) must not survive, and the LLM's own LEAD
+    # degree-1-in-C (pitch 60) must be present instead.
+    assert 67 not in [n.pitch for n in score.notes_with_role(Role.LEAD)]
+    assert 60 in [n.pitch for n in score.notes_with_role(Role.LEAD)]
+
+
+def test_heuristic_mode_unchanged(monkeypatch, tmp_path):
+    """arrange_mode='heuristic' (the default): identical to pre-AI behavior -
+    no ai_arranger call, no LLM output substitution."""
+    audio = tmp_path / "song.wav"
+    _tiny_song(audio)
+    _patch_common(monkeypatch)
+
+    def fake_pitched(stem, sr, role, min_duration=0.0):
+        pitch = 33 if role is Role.BASS else 48
+        return [NoteEvent(pitch, 0.0, 0.4, 64, role)]
+
+    monkeypatch.setattr(bs, "transcribe_pitched", fake_pitched)
+    monkeypatch.setattr(
+        bs, "transcribe_vocals",
+        lambda stem, sr, fmin, fmax, min_duration=0.06: [NoteEvent(67, 0.0, 0.5, 80, Role.LEAD)],
+    )
+
+    cfg = load_config()  # arrange_mode defaults to "heuristic"
+    cfg = replace(cfg, arrange=replace(cfg.arrange, harmony_mode="transcribe"))
+    score = build_score(audio, cfg)
+
+    assert 67 in [n.pitch for n in score.notes_with_role(Role.LEAD)]  # untouched by AI
