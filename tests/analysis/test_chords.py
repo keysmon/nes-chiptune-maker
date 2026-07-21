@@ -41,3 +41,10 @@ def test_detects_c_major_then_a_minor():
 def test_empty_signal_returns_no_segments():
     grid = TempoGrid(bpm=120.0, offset=0.0, beats_per_bar=4)
     assert detect_chords(np.array([], dtype=np.float32), 22050, grid) == []
+
+
+def test_micro_clip_returns_no_chords():
+    """A signal shorter than one beat yields no spurious chord."""
+    grid = TempoGrid(bpm=120.0, offset=0.0, beats_per_bar=4)  # 0.5 s/beat
+    y = np.zeros(int(22050 * 0.1), dtype=np.float32)  # 0.1 s << one beat
+    assert detect_chords(y, 22050, grid) == []

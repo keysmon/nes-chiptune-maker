@@ -130,6 +130,8 @@ class ArrangeConfig:
             raise ValueError(f"chord_subdivision must be >= 1, got {self.chord_subdivision}")
         if self.chord_tones < 1:
             raise ValueError(f"chord_tones must be >= 1, got {self.chord_tones}")
+        if not 0 <= self.chord_octave <= 8:
+            raise ValueError(f"chord_octave must be 0-8, got {self.chord_octave}")
         if self.chord_smooth_beats < 1:
             raise ValueError(f"chord_smooth_beats must be >= 1, got {self.chord_smooth_beats}")
         if self.melody_min_seconds < 0:

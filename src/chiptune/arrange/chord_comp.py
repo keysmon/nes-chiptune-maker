@@ -25,6 +25,17 @@ _HARMONY_VELOCITY = 80
 _MIN_COMP_NOTE_SECONDS = 0.01
 
 
+def _fold_pitch(pitch: int) -> int:
+    """Fold a pitch into the valid MIDI range [0, 127] by whole octaves, so an
+    extreme `chord_octave` (config-exposed, e.g. via the web UI) can never push a
+    chord tone past 127 and crash NoteEvent. Sane octaves are a no-op."""
+    while pitch > 127:
+        pitch -= 12
+    while pitch < 0:
+        pitch += 12
+    return pitch
+
+
 def _chord_tones(base_pitch: int, third_interval: int, tones: int) -> list[int]:
     """`tones` chord-tone MIDI pitches: root, third, fifth, then repeat an octave up.
 
@@ -81,7 +92,8 @@ def comp_chords(
     for seg in chords:
         base_pitch = (octave + 1) * 12 + seg.root
         third_interval = 3 if seg.is_minor else 4
-        sequence = _pattern_sequence(pattern, base_pitch, third_interval, tones)
+        sequence = [_fold_pitch(p) for p in
+                    _pattern_sequence(pattern, base_pitch, third_interval, tones)]
         if not sequence:
             continue
 

@@ -63,3 +63,12 @@ def test_drops_degenerate_tail_note_shorter_than_minimum():
     assert notes[0].start == 0.0
     assert notes[0].end == 0.5
     assert all(n.duration >= 0.01 for n in notes)
+
+
+def test_high_octave_folds_pitches_into_valid_midi_range():
+    """chord_octave is config/UI-exposed, so an extreme value must fold, not crash."""
+    grid = _grid()
+    seg = ChordSegment(start=0.0, end=grid.seconds_per_beat, root=8, is_minor=False)
+    notes = comp_chords([seg], pattern="up", subdivision=3, octave=8, tones=4, grid=grid)
+    assert notes, "should still emit notes"
+    assert all(0 <= n.pitch <= 127 for n in notes), "all pitches must be valid MIDI"

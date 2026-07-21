@@ -96,15 +96,20 @@ def detect_chords(
     mono: np.ndarray, sr: int, grid: TempoGrid, smooth_beats: int = 2
 ) -> list[ChordSegment]:
     """Detect the chord progression of `mono` on `grid`'s beat grid."""
-    if mono.size == 0:
-        return []
     duration = len(mono) / sr
+    # Too short to hold a chord: a micro-clip yields a spurious single garbage
+    # chord (librosa pads to >=1 frame), so return nothing rather than a wrong label.
+    if mono.size == 0 or duration < grid.seconds_per_beat:
+        return []
 
-    chroma = librosa.feature.chroma_cqt(y=mono, sr=sr)  # (12, n_frames)
+    # Both librosa calls must use the same hop or the frame->time mapping drifts;
+    # bind it once so a future edit can't desync them silently.
+    hop = 512
+    chroma = librosa.feature.chroma_cqt(y=mono, sr=sr, hop_length=hop)  # (12, n_frames)
     n_frames = chroma.shape[1]
     if n_frames == 0:
         return []
-    frame_times = librosa.frames_to_time(np.arange(n_frames), sr=sr)
+    frame_times = librosa.frames_to_time(np.arange(n_frames), sr=sr, hop_length=hop)
 
     beats = _beat_times(grid, duration)
     templates, labels = _triad_templates()
