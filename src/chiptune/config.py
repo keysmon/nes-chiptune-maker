@@ -21,8 +21,10 @@ VALID_ANALYSIS_KEYS = frozenset({
     "vocal_fmin",
     "vocal_fmax",
     "min_note_seconds",
-    "kick_max_hz",
-    "hat_min_hz",
+    "kick_band_hz",
+    "hat_band_hz",
+    "kick_low_frac_min",
+    "hat_high_frac_min",
     "onset_backtrack",
     "harmony_declash",
     "declash_semitones",
@@ -99,8 +101,10 @@ class AnalysisConfig:
     vocal_fmin: float
     vocal_fmax: float
     min_note_seconds: float
-    kick_max_hz: float
-    hat_min_hz: float
+    kick_band_hz: float
+    hat_band_hz: float
+    kick_low_frac_min: float
+    hat_high_frac_min: float
     onset_backtrack: bool
     harmony_declash: bool
     declash_semitones: int
@@ -110,9 +114,17 @@ class AnalysisConfig:
             raise ValueError(
                 f"vocal_fmin {self.vocal_fmin} must be below vocal_fmax {self.vocal_fmax}"
             )
-        if self.kick_max_hz >= self.hat_min_hz:
+        if self.kick_band_hz >= self.hat_band_hz:
             raise ValueError(
-                f"kick_max_hz {self.kick_max_hz} must be below hat_min_hz {self.hat_min_hz}"
+                f"kick_band_hz {self.kick_band_hz} must be below hat_band_hz {self.hat_band_hz}"
+            )
+        if not 0 < self.kick_low_frac_min <= 1:
+            raise ValueError(
+                f"kick_low_frac_min must be in (0, 1], got {self.kick_low_frac_min}"
+            )
+        if not 0 < self.hat_high_frac_min <= 1:
+            raise ValueError(
+                f"hat_high_frac_min must be in (0, 1], got {self.hat_high_frac_min}"
             )
         if self.min_note_seconds <= 0:
             raise ValueError(f"min_note_seconds must be positive, got {self.min_note_seconds}")

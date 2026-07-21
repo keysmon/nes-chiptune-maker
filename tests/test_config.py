@@ -103,7 +103,9 @@ def test_analysis_section_loads():
     cfg = load_config()
     assert cfg.analysis.include_vocals is True
     assert cfg.analysis.vocal_fmin < cfg.analysis.vocal_fmax
-    assert cfg.analysis.kick_max_hz < cfg.analysis.hat_min_hz
+    assert cfg.analysis.kick_band_hz < cfg.analysis.hat_band_hz
+    assert 0 < cfg.analysis.kick_low_frac_min <= 1
+    assert 0 < cfg.analysis.hat_high_frac_min <= 1
     assert cfg.analysis.min_note_seconds > 0
     assert cfg.analysis.harmony_declash is True
 
@@ -120,7 +122,8 @@ def test_rejects_unknown_analysis_key(tmp_path):
         f"[triangle]\nduty=0.0\n{VALID_CHANNEL}"
         f"[noise]\nduty=0.0\n{VALID_CHANNEL}"
         "[analysis]\ninclude_vocals=true\nvocal_fmin=80.0\nvocal_fmax=1000.0\n"
-        "min_note_seconds=0.033\nkick_max_hz=150.0\nhat_min_hz=6000.0\n"
+        "min_note_seconds=0.033\nkick_band_hz=150.0\nhat_band_hz=6000.0\n"
+        "kick_low_frac_min=0.5\nhat_high_frac_min=0.15\n"
         "onset_backtrack=true\nharmony_declash=true\ndeclash_semitones=1\n"
         "vocal_fmn=80.0\n"
     )

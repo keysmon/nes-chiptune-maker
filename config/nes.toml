@@ -85,8 +85,14 @@ include_vocals   = true    # false -> instrumental cover, lead taken from `other
 vocal_fmin       = 80.0    # librosa.pyin search floor (Hz)
 vocal_fmax       = 1000.0
 min_note_seconds = 0.033   # drop transcribed notes shorter than this (seconds)
-kick_max_hz      = 150.0   # spectral centroid below this -> kick
-hat_min_hz       = 6000.0  # spectral centroid above this -> hat; between -> snare
+# Drum classification by band-energy fraction (robust to hat/cymbal bleed in a
+# summed drum stem, where spectral centroid collapses the split). Thresholds
+# tuned on the real pop drum stem: low/high-frac percentiles gave a musically
+# plausible split of kick~46 / snare~48 / hat~29 across 123 onsets.
+kick_band_hz      = 150.0   # energy fraction below this band decides KICK
+hat_band_hz       = 6000.0  # energy fraction above this band decides HAT
+kick_low_frac_min = 0.5     # >= this fraction of energy below kick_band_hz -> KICK
+hat_high_frac_min = 0.15    # else >= this fraction above hat_band_hz -> HAT; else SNARE
 onset_backtrack  = true    # librosa onset backtracking to the local energy minimum
 harmony_declash  = true    # push a harmony note down an octave when it collides with the lead
 declash_semitones = 1      # "collides" = within this many semitones of a concurrent lead note
