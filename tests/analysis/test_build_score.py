@@ -149,14 +149,19 @@ def test_harmony_mode_chords_yields_far_fewer_notes_than_transcribe(monkeypatch,
     assert chords_density["mean_simultaneous"] < transcribe_density["mean_simultaneous"]
 
 
-def test_chords_mode_never_transcribes_other_when_include_vocals(monkeypatch, tmp_path):
+def test_chords_mode_arp_source_never_transcribes_other_when_include_vocals(monkeypatch, tmp_path):
+    """harmony_source='arp' (the legacy fixed-arpeggio fallback) builds HARMONY
+    purely from detected chords and must never basic-pitch transcribe the
+    'other' stem. harmony_source='select' (the default) deliberately DOES
+    transcribe 'other' for HARMONY candidates on the vocal path - see
+    test_chords_mode_select_source_transcribes_other_when_include_vocals below."""
     audio = tmp_path / "song.wav"
     _tiny_song(audio)
     _patch_common(monkeypatch)
 
     def fake_pitched(stem, sr, role, min_duration=0.0):
         if role is Role.HARMONY:
-            raise AssertionError("harmony_mode='chords' must not basic-pitch transcribe 'other'")
+            raise AssertionError("harmony_source='arp' must not basic-pitch transcribe 'other'")
         return [NoteEvent(33, 0.0, 0.4, 64, Role.BASS)]
 
     monkeypatch.setattr(bs, "transcribe_pitched", fake_pitched)
@@ -166,9 +171,39 @@ def test_chords_mode_never_transcribes_other_when_include_vocals(monkeypatch, tm
     )
 
     cfg = load_config()  # default harmony_mode is "chords"
+    cfg = replace(cfg, arrange=replace(cfg.arrange, harmony_source="arp"))
     score = build_score(audio, cfg)
 
     assert score.notes_with_role(Role.HARMONY)  # still gets a comped harmony
+
+
+def test_chords_mode_select_source_transcribes_other_when_include_vocals(monkeypatch, tmp_path):
+    """harmony_source='select' (the default) has no skyline_harmony to reuse on
+    the vocal path (there's no 'other' skyline split when vocals carry LEAD), so
+    it must basic-pitch transcribe 'other' for Role.HARMONY candidates - the
+    inverse of the 'arp' guarantee above."""
+    audio = tmp_path / "song.wav"
+    _tiny_song(audio)
+    _patch_common(monkeypatch)
+
+    calls = []
+
+    def fake_pitched(stem, sr, role, min_duration=0.0):
+        calls.append(role)
+        if role is Role.HARMONY:
+            return [NoteEvent(60, 0.0, 0.4, 100, Role.HARMONY)]
+        return [NoteEvent(33, 0.0, 0.4, 64, Role.BASS)]
+
+    monkeypatch.setattr(bs, "transcribe_pitched", fake_pitched)
+    monkeypatch.setattr(
+        bs, "transcribe_vocals",
+        lambda stem, sr, fmin, fmax, min_duration=0.06: [NoteEvent(67, 0.0, 1.0, 80, Role.LEAD)],
+    )
+
+    cfg = load_config()  # default harmony_mode="chords", harmony_source="select"
+    build_score(audio, cfg)
+
+    assert Role.HARMONY in calls  # 'other' WAS transcribed for HARMONY candidates
 
 
 def test_chords_mode_discards_skyline_harmony_half(monkeypatch, tmp_path):

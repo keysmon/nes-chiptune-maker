@@ -2,20 +2,25 @@
 
 Role mapping: vocals -> LEAD, bass -> BASS, drums -> PERCUSSION. HARMONY depends
 on `[arrange].harmony_mode`:
-  * "chords" (default) - the sparse arranger. HARMONY comes from
-    `chiptune.analysis.chords.detect_chords` on the ORIGINAL MIX, comped by
-    `chiptune.arrange.chord_comp.comp_chords`. The "other" stem is never
-    basic-pitch transcribed for HARMONY in this mode - that transcription is
-    exactly the "hundreds of near-simultaneous noisy notes" mud problem this
-    mode replaces.
+  * "chords" (default) - the sparse arranger. Chords come from
+    `chiptune.analysis.chords.detect_chords` on the ORIGINAL MIX. HARMONY is then
+    built per `[arrange].harmony_source`:
+      - "select" (default) - `chiptune.arrange.comp_select.select_comp` prunes,
+        snaps to the nearest chord tone, voice-leads, and enforces monophony
+        over the "other" stem's basic-pitch transcription (or reuses
+        `skyline_harmony` when that is already this material) - the raw
+        transcription's "hundreds of near-simultaneous noisy notes" never
+        reach HARMONY unfiltered.
+      - "arp" - the legacy fixed arpeggio, `chiptune.arrange.chord_comp.comp_chords`;
+        never basic-pitch transcribes the "other" stem for HARMONY at all.
   * "transcribe" - the original path: basic-pitch on the "other" stem,
     reproduced exactly (byte-for-byte call arguments) for backward compat.
 When `include_vocals` is False there is no vocal stem to carry the melody, so
 the LEAD is derived from the top (skyline) voice of an `other` transcription -
-this is still needed in "chords" mode too (there is no other melody source),
-but its covered/lower half is discarded rather than merged into HARMONY: the
-"other" stem is still transcribed in that one combination, but its output
-never populates HARMONY, which is the actual mud this mode fixes.
+this is still needed in "chords" mode too (there is no other melody source).
+Its covered/lower half (`skyline_harmony`) is discarded when `harmony_source`
+is "arp" (HARMONY comes entirely from the chord comp), but reused as the
+"select" comp's candidates when `harmony_source` is "select".
 
 LEAD and BASS are always passed through the sparse arranger's thinning
 transforms (`chiptune.arrange.sparse`), in both harmony_mode settings.
@@ -120,6 +125,19 @@ def declash_harmony(notes: list[NoteEvent], declash_semitones: int) -> list[Note
     return out
 
 
+def _build_chords_harmony(arr, other_candidates, chords, lead, grid):
+    """HARMONY for harmony_mode='chords', switched by arr.harmony_source.
+    `other_candidates` is the basic-pitch transcription of the 'other' stem
+    (Role.HARMONY notes) or None when not needed."""
+    from chiptune.arrange.comp_select import select_comp
+    if arr.harmony_source == "arp":
+        return comp_chords(
+            chords, pattern=arr.chord_comp_pattern, subdivision=arr.chord_subdivision,
+            octave=arr.chord_octave, tones=arr.chord_tones, grid=grid,
+        )
+    return select_comp(other_candidates or [], chords, lead, grid, arr)
+
+
 def _log_score_stats(label: str, score: Score, frame_rate: float) -> None:
     """Log one arrangement's role counts + density, tagged by mode. In "ai" mode
     the returned notes differ from the heuristic source, so this is called for
@@ -178,14 +196,18 @@ def build_score(audio_path, cfg: Config, cache_dir=None) -> Score:
     chords = []  # detected chord progression; fed to the AI arranger so it sees the real harmony
     if arr.harmony_mode == "chords":
         chords = detect_chords(mono, orig_sr, grid, smooth_beats=arr.chord_smooth_beats)
-        harmony = comp_chords(
-            chords,
-            pattern=arr.chord_comp_pattern,
-            subdivision=arr.chord_subdivision,
-            octave=arr.chord_octave,
-            tones=arr.chord_tones,
-            grid=grid,
-        )
+        # Candidate harmony notes for the "select" comp: the "other"-stem
+        # transcription (same material "transcribe" mode dumps raw). Only needed
+        # for "select"; "arp" ignores it. On the instrumental path skyline_harmony
+        # is already this material; on the vocal path we transcribe it here.
+        other_candidates = None
+        if arr.harmony_source == "select":
+            other_candidates = (
+                skyline_harmony if skyline_harmony is not None
+                else transcribe_pitched(stems["other"], sr, Role.HARMONY,
+                                        min_duration=a.min_note_seconds)
+            )
+        harmony = _build_chords_harmony(arr, other_candidates, chords, lead, grid)
     elif arr.harmony_mode == "transcribe":
         if a.include_vocals:
             harmony = transcribe_pitched(
