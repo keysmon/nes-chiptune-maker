@@ -20,6 +20,14 @@ def test_arrange_parses_llm_output_into_a_score(monkeypatch):
     # oct 4, a pitch the heuristic fallback (its only note is 60) never emits.
     assert 62 in {n.pitch for n in out.notes}
 
+def test_ai_density_validation():
+    from chiptune.config import AIConfig
+    base = dict(base_url="x", model="m", api_key_env="K", temperature=0.4, max_tokens=100)
+    assert AIConfig(**base).density == "balanced"                 # default = backward compatible
+    assert AIConfig(**base, density="full").density == "full"
+    with __import__("pytest").raises(ValueError):
+        AIConfig(**base, density="bogus")
+
 def test_arrange_caps_runaway_length(monkeypatch):
     # A teacher that writes a bass line far longer than the song must be truncated
     # to ~the song length (1.5x), not run out to the 600s buffer rail.
@@ -49,6 +57,13 @@ def test_arrange_falls_back_on_unparseable_output(monkeypatch):
 def test_format_prompt_includes_the_melody():
     p = ai_arranger.format_prompt(_score())
     assert "MELODY" in p.upper() and "120" in p  # tempo present
+
+def test_format_prompt_reflects_density():
+    # #2 density dial: the fullness directive changes with the density knob.
+    p_sparse = ai_arranger.format_prompt(_score(), density="sparse")
+    p_full = ai_arranger.format_prompt(_score(), density="full")
+    assert "SPARSE" in p_sparse and "FULL" not in p_sparse
+    assert "FULL" in p_full and "SPARSE" not in p_full
 
 def test_format_prompt_includes_chords_and_bass():
     # #1 informed AI: the detected chord progression + real bass line reach the LLM,

@@ -43,6 +43,7 @@ model       = "llama-3.3-70b-versatile"
 api_key_env = "GROQ_API_KEY"   # name of the env var holding the API key, never the key itself
 temperature = 0.4
 max_tokens  = 4000
+density     = "balanced"  # arrangement fullness: "sparse" (space, minimal) | "balanced" | "full" (rich)
 
 # duty: 0.125 / 0.25 / 0.5 / 0.75 are the only values the real chip supports
 [pulse1]                          # lead

@@ -49,7 +49,9 @@ VALID_AI_KEYS = frozenset({
     "api_key_env",
     "temperature",
     "max_tokens",
+    "density",
 })
+VALID_AI_DENSITIES = frozenset({"sparse", "balanced", "full"})
 VALID_ANALYSIS_KEYS = frozenset({
     "include_vocals",
     "vocal_fmin",
@@ -236,12 +238,15 @@ class AIConfig:
     api_key_env: str  # name of the env var holding the API key, never the key itself
     temperature: float
     max_tokens: int
+    density: str = "balanced"  # arrangement fullness: "sparse" | "balanced" | "full"
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.temperature <= 2.0:
             raise ValueError(f"temperature must be in [0, 2], got {self.temperature}")
         if self.max_tokens < 1:
             raise ValueError(f"max_tokens must be >= 1, got {self.max_tokens}")
+        if self.density not in VALID_AI_DENSITIES:
+            raise ValueError(f"density must be one of {sorted(VALID_AI_DENSITIES)}, got {self.density!r}")
 
 
 @dataclass(frozen=True)

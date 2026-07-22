@@ -15,6 +15,14 @@ from .notation import NotationError, parse_arrangement
 _DEFAULT_OCTAVES = {"LEAD": 4, "HARM": 3, "BASS": 2}
 _NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 
+# Arrangement fullness dial: the same melody+chords can be arranged sparse (good for
+# a busy/muddy source) or full (good for a thin one). Config-selected per song.
+_DENSITY_HINT = {
+    "sparse":   "DENSITY: SPARSE - lots of space, minimal HARM and BASS, let the melody breathe.",
+    "balanced": "DENSITY: BALANCED - support the melody without cluttering it.",
+    "full":     "DENSITY: FULL - rich, active HARM and BASS throughout; keep the accompaniment present.",
+}
+
 _SYSTEM = (
     "You are an expert NES (2A03) chiptune arranger. The chip has exactly 4 voices: "
     "Pulse1 (LEAD), Pulse2 (HARM), Triangle (BASS), Noise (DRUMS: K kick, S snare, H hat). "
@@ -37,10 +45,11 @@ _SYSTEM = (
 )
 
 
-def format_prompt(score: Score, chords: list | None = None) -> str:
+def format_prompt(score: Score, chords: list | None = None, density: str = "balanced") -> str:
     """Summarize the analyzed song for the LLM: melody, the DETECTED chord
     progression, the real bass line, and drum density - so it arranges the actual
-    song instead of guessing the harmony from the melody alone."""
+    song instead of guessing the harmony from the melody alone. `density` selects
+    how full the arrangement should be."""
     spb = score.tempo.seconds_per_beat
 
     def fmt(notes):
@@ -62,6 +71,7 @@ def format_prompt(score: Score, chords: list | None = None) -> str:
     lines.append(f"MELODY (note:beats): {fmt(lead)}")
     lines.append(f"BASS (note:beats): {fmt(bass)}")
     lines.append(f"DRUMS in source: {'busy' if n_drums > total_beats else 'present' if n_drums else 'none'}")
+    lines.append(_DENSITY_HINT.get(density, _DENSITY_HINT["balanced"]))
     lines.append("")
     lines.append(f"Arrange this for the NES 4 voices now. Follow the CHORDS for HARM and the BASS "
                  f"roots; keep the MELODY as LEAD. Each voice's durations must sum to about "
@@ -93,7 +103,7 @@ def arrange(score: Score, ai_cfg: AIConfig, octaves: dict[str, int] | None,
     # parse_arrangement further clamps this to the absolute rail.
     max_seconds = max(score.duration * 1.5, score.duration + 8.0)
     try:
-        text = _call_llm(format_prompt(score, chords), ai_cfg)
+        text = _call_llm(format_prompt(score, chords, ai_cfg.density), ai_cfg)
         notes = parse_arrangement(text, score.tempo, octaves, max_seconds=max_seconds)
     except NotationError as exc:
         print(f"chiptune.ai_arranger: unparseable output ({exc}); using heuristic", file=sys.stderr)
