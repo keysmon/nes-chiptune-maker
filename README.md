@@ -75,13 +75,17 @@ Two flavors:
 .venv/bin/python -m chiptune.web.app     # serves http://127.0.0.1:8100
 ```
 
-**Hosted playground (Vercel)** - live at **https://web-demo-keysmons-projects.vercel.app**.
+**Hosted playground (Vercel)** - live at **https://web-demo-sandy-nine.vercel.app**.
 Source in `web-demo/`. The heavy analysis (Demucs + basic-pitch: GPU, big models,
-CoreML) can't run on serverless, so the hosted version ships *pre-analyzed* songs
-and runs only the light, deterministic synthesis half per request (pure numpy/scipy;
-WAV written with the stdlib `wave` module so there's no libsndfile dependency). You
-get the synthesis controls live plus the `chords` vs `transcribe` harmony A/B; live
-song upload stays in the local app. Deploy from `web-demo/` with `vercel deploy --prod`.
+CoreML) can't run on serverless, so the hosted version ships a library of
+*pre-analyzed* Creative-Commons sample songs - instrumental and vocal (see
+`web-demo/CREDITS.md` for the CC-BY / CC0 credits) - and runs only the light,
+deterministic synthesis half per request (pure numpy/scipy; WAV written with the
+stdlib `wave` module so there's no libsndfile dependency). Pick a sample song,
+toggle the **heuristic / AI** arrangement, and tune the synthesis controls live;
+converting *your own* song stays in the local app. (Vocal songs are heuristic-only
+in the demo - the AI arrangements are baked offline and only for the instrumental
+set so far.) Deploy from `web-demo/` with `vercel deploy --prod`.
 
 Drop in an audio file (a 20-40 s clip works best). The server separates and
 transcribes it once (~10-40 s), then you tune 26 controls across 7 groups

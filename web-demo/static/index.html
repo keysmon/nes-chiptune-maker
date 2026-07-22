@@ -88,6 +88,12 @@ const SONGS = [
   {id:'jazz',      title:'Closer to Jazz',       artist:'Jason Shaw (Audionautix)', cat:'Jazz',                 license:'CC BY 3.0',    url:'https://commons.wikimedia.org/wiki/File:Audionautix-com-ccby-closertojazz.mp3'},
   {id:'soul',      title:'Soul Sync',            artist:'Ketsa',                    cat:'Soul / R&B',           license:'CC BY 4.0',    url:'https://freemusicarchive.org/music/Ketsa/cc-by-free-to-use-for-anything/soul-sync/'},
   {id:'acoustic',  title:'Solo Acoustic Guitar', artist:'Jason Shaw (Audionautix)', cat:'Sparse acoustic',      license:'CC BY 3.0 US', url:'https://commons.wikimedia.org/wiki/File:Jason_Shaw_-_SOLO_ACOUSTIC_GUITAR.ogg'},
+  // Vocal tracks (heuristic only - the sung melody becomes the LEAD; no AI bake)
+  {id:'crazyglue', title:'Crazy Glue',          artist:'Josh Woodward',       cat:'Vocal · upbeat folk-pop', license:'CC BY 4.0',    url:'https://www.joshwoodward.com/song/CrazyGlue', ai:false},
+  {id:'lullaby',   title:'California Lullabye',  artist:'Josh Woodward',       cat:'Vocal · acoustic pop',    license:'CC BY 4.0',    url:'https://www.joshwoodward.com/song/californialullabye', ai:false},
+  {id:'saboteurs', title:'Saboteurs',           artist:'Josh Woodward',       cat:'Vocal · dark alt-rock',   license:'CC BY 4.0',    url:'https://www.joshwoodward.com/song/Saboteurs', ai:false},
+  {id:'feldman',   title:'I Saw You Today',      artist:'Bob A. Feldman',      cat:'Vocal · folk ballad',     license:'CC0 1.0',      url:'https://freemusicarchive.org/music/bob-a-feldman-33/single/i-saw-you-today/', ai:false},
+  {id:'topone',    title:'What I Want',          artist:'The Top One Percent', cat:'Vocal · blues-pop',       license:'CC BY 4.0',    url:'https://freemusicarchive.org/music/the-top-one-percent/single/what-i-want/', ai:false},
 ];
 
 const CONTROLS = [
@@ -151,11 +157,21 @@ async function render(){
 $('#aAI').onclick=()=>{harmony='ai'; $('#aAI').classList.add('on'); $('#aHeur').classList.remove('on'); render();};
 $('#aHeur').onclick=()=>{harmony='chords'; $('#aHeur').classList.add('on'); $('#aAI').classList.remove('on'); render();};
 
+function setArrangeAvailability(s){
+  // Songs without a baked AI arrangement (ai:false) offer heuristic only.
+  const hasAI = s.ai !== false;
+  const aAI = $('#aAI');
+  aAI.disabled = !hasAI;
+  aAI.style.opacity = hasAI ? '' : '.4';
+  aAI.title = hasAI ? '' : 'AI arrangement not available for this song (heuristic only)';
+  if(!hasAI && harmony==='ai'){ harmony='chords'; $('#aHeur').classList.add('on'); aAI.classList.remove('on'); }
+}
 function setSong(id){
   song = id; const s = SONGS.find(x=>x.id===id);
   $('#orig').src = '/original/'+id;
   $('#songName').textContent = s.title;
   $('#pickCat').textContent = s.cat + ' · ' + s.license;
+  setArrangeAvailability(s);
   render();
 }
 function initSongs(){
@@ -173,6 +189,7 @@ function initSongs(){
   }
   const s = SONGS.find(x=>x.id===song);
   $('#orig').src='/original/'+song; $('#songName').textContent=s.title; $('#pickCat').textContent=s.cat+' · '+s.license;
+  setArrangeAvailability(s);
 }
 
 initSongs(); build(); render();
