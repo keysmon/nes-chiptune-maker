@@ -34,6 +34,9 @@ bass_min_seconds             = 0.08      # drop BASS notes shorter than this (si
 harmony_rest_on_busy_melody  = false     # drop harmony notes that land on a melodic attack, giving the melody space
 lead_max_leap                = 0          # DISABLED: the fold chains toward the previous note and shifted real melody notes by up to 2 octaves, mangling the tune. Needs a non-chaining rework before re-enabling. 0 = off
 
+harmony_source   = "select"   # "select" (note-selection comp) | "arp" (legacy fixed arpeggio)
+select_min_gap   = 0.10       # seconds; minimum spacing between selected comp notes (sparsity budget)
+
 arrange_mode = "heuristic"   # "heuristic" | "ai" (LLM arranger); Score-affecting, forces a re-analyze
 
 # LLM arranger connection (opt-in via arrange_mode="ai"), OpenAI-compatible so any

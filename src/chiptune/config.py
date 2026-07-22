@@ -42,8 +42,11 @@ VALID_ARRANGE_KEYS = frozenset({
     "harmony_rest_on_busy_melody",
     "arrange_mode",
     "lead_max_leap",
+    "harmony_source",
+    "select_min_gap",
 })
 VALID_ARRANGE_MODES = frozenset({"heuristic", "ai"})
+VALID_HARMONY_SOURCES = frozenset({"select", "arp"})
 VALID_AI_KEYS = frozenset({
     "base_url",
     "model",
@@ -129,6 +132,8 @@ class ArrangeConfig:
     # (it optimized a jump%% proxy, not the melody). Needs a non-chaining rework - fold
     # only isolated single-note spikes against local context - before re-enabling.
     lead_max_leap: int = 0
+    harmony_source: str = "select"
+    select_min_gap: float = 0.10
 
     def __post_init__(self) -> None:
         if self.bass_low >= self.bass_high:
@@ -166,6 +171,13 @@ class ArrangeConfig:
             raise ValueError(
                 f"arrange_mode {self.arrange_mode!r} must be one of {sorted(VALID_ARRANGE_MODES)}"
             )
+        if self.harmony_source not in VALID_HARMONY_SOURCES:
+            raise ValueError(
+                f"harmony_source {self.harmony_source!r} must be one of "
+                f"{sorted(VALID_HARMONY_SOURCES)}"
+            )
+        if self.select_min_gap < 0:
+            raise ValueError(f"select_min_gap must be >= 0, got {self.select_min_gap}")
 
 
 @dataclass(frozen=True)

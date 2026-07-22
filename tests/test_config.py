@@ -1,6 +1,6 @@
 # tests/test_config.py
 import pytest
-from chiptune.config import load_config
+from chiptune.config import load_config, DEFAULT_CONFIG_PATH, config_from_dict, default_raw_config
 
 
 def test_loads_default_config():
@@ -256,3 +256,23 @@ def test_rejects_unknown_analysis_key(tmp_path):
     )
     with pytest.raises(ValueError, match="vocal_fmn"):
         load_config(bad)
+
+
+def test_arrange_config_has_harmony_source_and_min_gap():
+    cfg = load_config(DEFAULT_CONFIG_PATH)
+    assert cfg.arrange.harmony_source == "select"
+    assert cfg.arrange.select_min_gap == pytest.approx(0.10)
+
+
+def test_invalid_harmony_source_rejected():
+    raw = default_raw_config()
+    raw["arrange"]["harmony_source"] = "bogus"
+    with pytest.raises(ValueError, match="harmony_source"):
+        config_from_dict(raw)
+
+
+def test_negative_min_gap_rejected():
+    raw = default_raw_config()
+    raw["arrange"]["select_min_gap"] = -0.1
+    with pytest.raises(ValueError, match="select_min_gap"):
+        config_from_dict(raw)
