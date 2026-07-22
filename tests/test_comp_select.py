@@ -1,5 +1,16 @@
+from types import SimpleNamespace
+
 from chiptune.analysis.chords import ChordSegment
-from chiptune.arrange.comp_select import _tone_pcs, _chord_at, _snap
+from chiptune.arrange.comp_select import (
+    _chord_at,
+    _importance,
+    _lead_active,
+    _snap,
+    _tone_pcs,
+    _voice_lead,
+    select_comp,
+)
+from chiptune.score import NoteEvent, Role, TempoGrid
 
 C_MAJ = ChordSegment(start=0.0, end=1.0, root=0, is_minor=False)   # C E G -> pcs {0,4,7}
 A_MIN = ChordSegment(start=1.0, end=2.0, root=9, is_minor=True)    # A C E -> pcs {9,0,4}
@@ -27,10 +38,6 @@ def test_snap_moves_pitch_to_nearest_chord_tone():
     assert _snap(67, C_MAJ) == 67
 
 
-from chiptune.score import NoteEvent, Role
-from chiptune.arrange.comp_select import _importance, _lead_active, _voice_lead
-
-
 def _h(pitch, start, end, vel=80):
     return NoteEvent(pitch=pitch, start=start, end=end, velocity=vel, role=Role.HARMONY)
 
@@ -43,7 +50,7 @@ def test_importance_rewards_duration_loudness_and_chord_fit():
 
 def test_importance_off_chord_is_penalized_vs_same_note_in_chord():
     note = _h(64, 0.0, 0.5)  # E
-    assert _importance(note, C_MAJ) > _importance(note, A_MIN.__class__(start=0.0, end=1.0, root=1, is_minor=False))
+    assert _importance(note, C_MAJ) > _importance(note, ChordSegment(start=0.0, end=1.0, root=1, is_minor=False))
 
 
 def test_lead_active_detects_overlap():
@@ -63,3 +70,40 @@ def test_voice_lead_shifts_octaves_toward_previous():
     assert _voice_lead(48, 67) == 72
     # no previous -> unchanged
     assert _voice_lead(64, None) == 64
+
+
+def _grid(bpm=120.0):
+    return TempoGrid(bpm=bpm, offset=0.0, beats_per_bar=4)
+
+
+def _cfg(min_gap=0.10, rest=False, octave=4):
+    return SimpleNamespace(select_min_gap=min_gap,
+                           harmony_rest_on_busy_melody=rest,
+                           chord_octave=octave)
+
+
+def test_select_keeps_important_notes_spaced_and_snapped_monophonic():
+    chords = [ChordSegment(start=0.0, end=2.0, root=0, is_minor=False)]  # C major throughout
+    # three candidates; the middle is a loud long D (off-chord, will snap), plus two short quiet ones close in time
+    cands = [
+        _h(62, 0.00, 0.80, vel=110),   # D, long+loud -> most important, snaps to C(60) or E
+        _h(61, 0.05, 0.10, vel=30),    # too close to the first (< min_gap) -> dropped
+        _h(67, 1.00, 1.50, vel=90),    # G, later -> kept
+    ]
+    out = select_comp(cands, chords, [], _grid(), _cfg())
+    # all HARMONY, all chord tones, strictly monophonic, time-ordered
+    assert out and all(n.role is Role.HARMONY for n in out)
+    assert all(n.pitch % 12 in {0, 4, 7} for n in out)
+    for a, b in zip(out, out[1:]):
+        assert a.start < b.start and a.end <= b.start
+    starts = [round(n.start, 2) for n in out]
+    assert 0.05 not in starts   # the < min_gap note was dropped
+
+
+def test_select_rests_when_lead_active_and_rest_enabled():
+    chords = [ChordSegment(start=0.0, end=1.0, root=0, is_minor=False)]
+    cands = [_h(60, 0.2, 0.6, vel=100)]
+    lead = [NoteEvent(pitch=72, start=0.0, end=1.0, velocity=90, role=Role.LEAD)]
+    assert select_comp(cands, chords, lead, _grid(), _cfg(rest=True)) == []
+    # with rest disabled the note survives
+    assert len(select_comp(cands, chords, lead, _grid(), _cfg(rest=False))) == 1
