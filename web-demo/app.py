@@ -8,6 +8,7 @@ swaps the two pre-baked Scores. Live song upload runs in the local full app.
 """
 import io
 import os
+import re
 import tomllib
 import wave
 
@@ -29,7 +30,8 @@ _BASE = os.path.dirname(os.path.abspath(__file__))
 _STATIC = os.path.join(_BASE, "static")
 _DEFAULT = tomllib.load(open(os.path.join(_BASE, "nes.toml"), "rb"))
 _SCORES: dict[str, Score] = {}
-_VALID_HARMONY = ("chords", "transcribe")
+_VALID_HARMONY = ("chords", "transcribe", "ai")
+_SLUG = re.compile(r"^[a-z0-9]+$")
 
 app = FastAPI(title="Chiptune Maker playground")
 
@@ -92,9 +94,14 @@ def index():
     return FileResponse(os.path.join(_STATIC, "index.html"))
 
 
-@app.get("/pop-original.mp3")
-def original():
-    return FileResponse(os.path.join(_STATIC, "pop-original.mp3"), media_type="audio/mpeg")
+@app.get("/original/{song}")
+def original(song: str):
+    if not _SLUG.match(song):
+        raise HTTPException(400, "bad song id")
+    path = os.path.join(_STATIC, f"{song}-original.mp3")
+    if not os.path.exists(path):
+        raise HTTPException(404, "no such song")
+    return FileResponse(path, media_type="audio/mpeg")
 
 
 @app.post("/api/render")

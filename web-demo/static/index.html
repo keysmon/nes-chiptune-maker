@@ -30,6 +30,10 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
 #status{font-size:13px;color:var(--mut);min-height:20px;margin-top:10px}#status .spin{color:var(--accent)}
 .stats{font-size:12px;color:var(--mut);margin-top:10px}.stats b{color:var(--fg)}
 .note{color:var(--mut);font-size:11px;margin-top:10px;border-top:1px solid var(--grid);padding-top:10px}
+.picker{width:100%;background:#232840;color:var(--fg);border:1px solid var(--grid);border-radius:8px;padding:9px;font:inherit;margin-bottom:6px}
+.pickcat{color:var(--mut);font-size:11px;margin-bottom:10px}
+.credit{font-size:11.5px;color:var(--mut);padding:5px 0;border-top:1px solid var(--grid)}
+.credit:first-child{border-top:none}.credit a{color:var(--accent2)}.credit b{color:var(--fg)}
 </style>
 </head>
 <body>
@@ -42,32 +46,49 @@ This hosted demo ships pre-analyzed songs and runs the synthesizer per request. 
   <div class=left>
     <div class=card>
       <h2>Listen</h2>
-      <div class=player-label>Original (pop.00000)</div>
-      <audio id=orig controls src="/pop-original.mp3"></audio>
+      <div class=player-label>Original - <span id=songName></span></div>
+      <audio id=orig controls></audio>
       <div class=player-label chip>Chiptune</div>
       <audio id=chip controls></audio>
       <div style="margin-top:12px"><a id=dl><button id=dlBtn disabled>Download .wav</button></a></div>
       <div id=status></div>
       <div class=stats id=stats></div>
-      <div class=note>The full local app also does live song upload, chord-octave/pattern, melody &amp; bass thinning, and de-clash - anything that needs re-analysis. This playground exposes the synthesis controls (instant) plus the harmony A/B.</div>
+      <div class=note>The full local app also does live song upload, chord-octave/pattern, melody &amp; bass thinning, and de-clash - anything that needs re-analysis. This playground exposes the synthesis controls (instant) plus the arrangement A/B (AI vs heuristic).</div>
     </div>
   </div>
 
   <div class=card>
     <h2>Customize</h2>
-    <div class=groupname>Harmony source</div>
+    <div class=groupname>Sample song</div>
+    <select id=songPick class=picker></select>
+    <div class=pickcat id=pickCat></div>
+    <div class=groupname>Arrangement</div>
     <div class=ab>
-      <button id=hChords class=on>chords (clean)</button>
-      <button id=hTrans>transcribe (raw)</button>
+      <button id=aAI>AI (Groq)</button>
+      <button id=aHeur class=on>Heuristic</button>
     </div>
-    <div style="color:var(--mut);font-size:11px;margin-bottom:4px">The A/B that matters: detected-chord comping vs. the raw note-for-note (muddier) harmony.</div>
+    <div style="color:var(--mut);font-size:11px;margin-bottom:4px">The A/B that matters: the LLM arranger (sparse, melody-first) vs. the deterministic heuristic (fuller, busier).</div>
     <div id=controls></div>
   </div>
 </div>
 
+<div class=card style="max-width:760px">
+  <h2>Sample track credits</h2>
+  <div id=credits></div>
+</div>
+
 <script>
 const $ = s => document.querySelector(s);
-let harmony = 'chords', values = {}, timer = null, rendering = false, queued = false;
+let song = 'synth', harmony = 'chords', values = {}, timer = null, rendering = false, queued = false;
+
+const SONGS = [
+  {id:'synth',     title:'Retro Synths',         artist:'HoliznaCC0',               cat:'Synth-pop',            license:'CC0 1.0',      url:'https://freemusicarchive.org/music/holiznacc0/power-pop/retro-synths/'},
+  {id:'rock',      title:'PopMetal',             artist:'Jason Shaw (Audionautix)', cat:'Dense rock',           license:'CC BY 3.0',    url:'https://commons.wikimedia.org/wiki/File:Audionautix-com-ccby-popmetal.mp3'},
+  {id:'breakbeat', title:'Something Elated',     artist:'Broke For Free',           cat:'Drum-heavy breakbeat', license:'CC BY 3.0 US', url:'https://freemusicarchive.org/music/Broke_For_Free/Something_EP/Broke_For_Free_-_Something_EP_-_05_Something_Elated/'},
+  {id:'jazz',      title:'Closer to Jazz',       artist:'Jason Shaw (Audionautix)', cat:'Jazz',                 license:'CC BY 3.0',    url:'https://commons.wikimedia.org/wiki/File:Audionautix-com-ccby-closertojazz.mp3'},
+  {id:'soul',      title:'Soul Sync',            artist:'Ketsa',                    cat:'Soul / R&B',           license:'CC BY 4.0',    url:'https://freemusicarchive.org/music/Ketsa/cc-by-free-to-use-for-anything/soul-sync/'},
+  {id:'acoustic',  title:'Solo Acoustic Guitar', artist:'Jason Shaw (Audionautix)', cat:'Sparse acoustic',      license:'CC BY 3.0 US', url:'https://commons.wikimedia.org/wiki/File:Jason_Shaw_-_SOLO_ACOUSTIC_GUITAR.ogg'},
+];
 
 const CONTROLS = [
   {g:'Levels', p:'levels.pulse1', l:'Lead', min:0, max:1.5, step:.05, d:1.0},
@@ -115,22 +136,46 @@ async function render(){
   if(rendering){ queued=true; return; }
   rendering=true; status('Rendering ...', true);
   let r;
-  try { r = await fetch('/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({song:'pop',harmony,overrides:expand(values)})}); }
+  try { r = await fetch('/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({song,harmony,overrides:expand(values)})}); }
   catch(e){ status('Error: '+e); rendering=false; if(queued){queued=false;go();} return; }
   if(!r.ok){ status('Error: '+(await r.text())); rendering=false; if(queued){queued=false;go();} return; }
   const t0=performance.now();
   const blob=await r.blob(); const url=URL.createObjectURL(blob);
   const chip=$('#chip'); chip.src=url;
   $('#dl').href=url; $('#dl').download='chiptune.wav'; $('#dlBtn').disabled=false;
-  $('#stats').innerHTML=`<b>${(blob.size/1024).toFixed(0)} KB</b> wav · harmony: <b>${harmony}</b>`;
+  $('#stats').innerHTML=`<b>${(blob.size/1024).toFixed(0)} KB</b> wav · arrangement: <b>${harmony==='ai'?'AI (Groq)':'heuristic'}</b>`;
   status('Ready.');
   rendering=false; if(queued){queued=false;go();}
 }
 
-$('#hChords').onclick=()=>{harmony='chords'; $('#hChords').classList.add('on'); $('#hTrans').classList.remove('on'); render();};
-$('#hTrans').onclick=()=>{harmony='transcribe'; $('#hTrans').classList.add('on'); $('#hChords').classList.remove('on'); render();};
+$('#aAI').onclick=()=>{harmony='ai'; $('#aAI').classList.add('on'); $('#aHeur').classList.remove('on'); render();};
+$('#aHeur').onclick=()=>{harmony='chords'; $('#aHeur').classList.add('on'); $('#aAI').classList.remove('on'); render();};
 
-build(); render();
+function setSong(id){
+  song = id; const s = SONGS.find(x=>x.id===id);
+  $('#orig').src = '/original/'+id;
+  $('#songName').textContent = s.title;
+  $('#pickCat').textContent = s.cat + ' · ' + s.license;
+  render();
+}
+function initSongs(){
+  const pick = $('#songPick');
+  for(const s of SONGS){ const o=document.createElement('option'); o.value=s.id; o.textContent=`${s.title} - ${s.cat}`; pick.appendChild(o); }
+  pick.value = song; pick.onchange = e => setSong(e.target.value);
+  const cr = $('#credits');
+  for(const s of SONGS){
+    const d=document.createElement('div'); d.className='credit';
+    const attr = s.license.startsWith('CC0')
+      ? `<b>"${s.title}"</b> by ${s.artist} - CC0 (public domain, no attribution required)`
+      : `<b>"${s.title}"</b> by ${s.artist} - licensed ${s.license}`;
+    d.innerHTML = `${attr} - <a href="${s.url}" target=_blank rel=noopener>source</a>`;
+    cr.appendChild(d);
+  }
+  const s = SONGS.find(x=>x.id===song);
+  $('#orig').src='/original/'+song; $('#songName').textContent=s.title; $('#pickCat').textContent=s.cat+' · '+s.license;
+}
+
+initSongs(); build(); render();
 </script>
 </body>
 </html>
