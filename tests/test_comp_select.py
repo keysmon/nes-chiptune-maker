@@ -107,3 +107,27 @@ def test_select_rests_when_lead_active_and_rest_enabled():
     assert select_comp(cands, chords, lead, _grid(), _cfg(rest=True)) == []
     # with rest disabled the note survives
     assert len(select_comp(cands, chords, lead, _grid(), _cfg(rest=False))) == 1
+
+
+def test_fallback_fills_chords_with_no_candidates():
+    # Two chords; only the first has a candidate. The second must get one voice-led chord tone.
+    chords = [
+        ChordSegment(start=0.0, end=1.0, root=0, is_minor=False),   # C: has a candidate
+        ChordSegment(start=1.0, end=2.0, root=7, is_minor=False),   # G: empty -> fallback
+    ]
+    cands = [_h(60, 0.1, 0.5, vel=100)]
+    out = select_comp(cands, chords, [], _grid(), _cfg())
+    # a note starts within the second chord's span
+    assert any(1.0 <= n.start < 2.0 for n in out)
+    # that fallback note is a G-major chord tone
+    fb = [n for n in out if 1.0 <= n.start < 2.0][0]
+    assert fb.pitch % 12 in {7, 11, 2}   # G B D
+    # still monophonic overall
+    for a, b in zip(out, out[1:]):
+        assert a.end <= b.start
+
+
+def test_all_empty_candidates_still_produces_a_comp():
+    chords = [ChordSegment(start=0.0, end=1.0, root=0, is_minor=False)]
+    out = select_comp([], chords, [], _grid(), _cfg())
+    assert len(out) == 1 and out[0].pitch % 12 in {0, 4, 7}

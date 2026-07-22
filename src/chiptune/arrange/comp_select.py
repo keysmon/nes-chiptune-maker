@@ -98,7 +98,8 @@ def select_comp(
     Greedy by importance, spaced at least `cfg.select_min_gap` apart on start
     times; optionally rest under an active LEAD note; snap each kept note to the
     nearest detected chord tone; voice-lead octaves for smooth motion; enforce
-    monophony. (Chord-tone fallback for un-comped chords is added in a later step.)
+    monophony. Any chord segment left with no emitted note gets a voice-led
+    chord-tone fallback so the comp never goes silent on a chord.
     """
     if not chords:
         return []
@@ -123,6 +124,31 @@ def select_comp(
             continue
         pitch = _voice_lead(_snap(n.pitch, chord), prev_pitch)
         emitted.append(NoteEvent(pitch=pitch, start=n.start, end=n.end,
+                                 velocity=_HARMONY_VELOCITY, role=Role.HARMONY))
+        prev_pitch = pitch
+
+    # Fallback: any chord segment with no emitted note gets one voice-led chord
+    # tone (root snapped into the chord, at the configured octave) so the comp
+    # never goes silent on a chord - the safety net for poor transcriptions.
+    # Resting under a busy melody still wins over the fallback: giving the
+    # tune space is a deliberate choice, not an untrustworthy transcription,
+    # so a chord with an active LEAD is not force-filled either (this is the
+    # brief-code fix noted in batchB-report.md - see "Brief defect found").
+    def _covered(c: ChordSegment) -> bool:
+        return any(c.start <= e.start < c.end for e in emitted)
+
+    spb = grid.seconds_per_beat
+    for c in chords:
+        if _covered(c):
+            continue
+        end = min(c.start + spb, c.end)
+        if end <= c.start:
+            continue
+        if cfg.harmony_rest_on_busy_melody and _lead_active(lead_notes, c.start, end):
+            continue
+        root_midi = (cfg.chord_octave + 1) * 12 + c.root
+        pitch = _voice_lead(_snap(root_midi, c), prev_pitch)
+        emitted.append(NoteEvent(pitch=pitch, start=c.start, end=end,
                                  velocity=_HARMONY_VELOCITY, role=Role.HARMONY))
         prev_pitch = pitch
     return _enforce_mono(emitted)
