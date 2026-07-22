@@ -133,7 +133,7 @@ class ArrangeConfig:
     # only isolated single-note spikes against local context - before re-enabling.
     lead_max_leap: int = 0
     harmony_source: str = "select"
-    select_min_gap: float = 0.10
+    select_min_gap: float = 0.30
 
     def __post_init__(self) -> None:
         if self.bass_low >= self.bass_high:
