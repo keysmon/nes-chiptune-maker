@@ -207,10 +207,22 @@ def test_chords_mode_select_source_transcribes_other_when_include_vocals(monkeyp
 
 
 def test_chords_mode_discards_skyline_harmony_half(monkeypatch, tmp_path):
-    """include_vocals=False + harmony_mode='chords': `other` is still
-    transcribed to derive the skyline LEAD (there is no other melody
-    source), but its covered/lower half must NOT populate HARMONY - HARMONY
-    comes entirely from chord comp in this mode."""
+    """include_vocals=False + harmony_mode='chords' + harmony_source='arp':
+    `other` is still transcribed to derive the skyline LEAD (there is no
+    other melody source on the instrumental path), but its covered/lower
+    half (skyline_harmony) must NOT populate HARMONY - under 'arp' HARMONY
+    comes entirely from the chord-comp arpeggio (`comp_chords`), which
+    structurally never reads skyline_harmony/other_candidates at all. This
+    pins the same invariant as
+    test_chords_mode_arp_source_never_transcribes_other_when_include_vocals
+    above, but on the include_vocals=False path where skyline_harmony
+    (rather than a full basic-pitch 'other' transcription) is the material
+    that must be discarded.
+
+    NOTE: under harmony_source='select' (the default) this invariant does
+    NOT hold - select_comp reuses skyline_harmony as its candidate pool and
+    snaps it into HARMONY; see
+    test_chords_mode_select_source_transcribes_other_when_include_vocals."""
     audio = tmp_path / "song.wav"
     _tiny_song(audio)
     _patch_common(monkeypatch)
@@ -227,13 +239,28 @@ def test_chords_mode_discards_skyline_harmony_half(monkeypatch, tmp_path):
     )
 
     cfg = load_config()
-    cfg = replace(cfg, analysis=replace(cfg.analysis, include_vocals=False))
+    cfg = replace(
+        cfg,
+        analysis=replace(cfg.analysis, include_vocals=False),
+        arrange=replace(cfg.arrange, harmony_source="arp"),
+    )
     score = build_score(audio, cfg)
 
     lead = [n for n in score.notes if n.role is Role.LEAD]
     assert lead and max(n.pitch for n in lead) == 72  # skyline lead still derived
-    assert all(n.pitch != 60 for n in score.notes_with_role(Role.HARMONY)), (
-        "the discarded skyline harmony half (pitch 60) must not leak into HARMONY"
+
+    harmony = score.notes_with_role(Role.HARMONY)
+    assert harmony, "must still get a comped harmony"
+    # comp_chords hardcodes velocity=_HARMONY_VELOCITY (80) for every note it
+    # emits; the fixture's raw `other` transcription above uses velocity=64.
+    # A velocity-64 note in HARMONY would prove the discarded skyline harmony
+    # half leaked through instead of being replaced by the chord comp. This
+    # holds regardless of what the detected chord's pitch classes happen to
+    # be - unlike checking `pitch != 60`, which only passed before by
+    # coincidence of the sine's detected chord not containing pitch class C.
+    assert all(n.velocity == 80 for n in harmony), (
+        "HARMONY must come entirely from the chord-comp arpeggio (velocity=80), "
+        "not the discarded skyline harmony half (velocity=64)"
     )
 
 

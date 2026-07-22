@@ -22,7 +22,10 @@ def test_arp_source_reproduces_comp_chords_exactly():
     chords = [ChordSegment(start=0.0, end=grid.seconds_per_beat, root=0, is_minor=False)]
     expected = comp_chords(chords, pattern="up", subdivision=3, octave=4, tones=3, grid=grid)
     got = _build_chords_harmony(_arr(harmony_source="arp"), None, chords, [], grid)
-    assert [(n.pitch, n.start, n.end) for n in got] == [(n.pitch, n.start, n.end) for n in expected]
+    # Full NoteEvent equality (pitch, start, end, velocity, role, percussion) -
+    # the global constraint is that arp reproduces today's comp_chords output
+    # EXACTLY, not just its timing/pitch.
+    assert got == expected
 
 
 def test_select_source_uses_selection_and_is_harmony_monophonic():
