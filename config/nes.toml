@@ -32,7 +32,7 @@ chord_smooth_beats           = 4         # mode-smoothing window (beats); higher
 melody_min_seconds           = 0.08      # drop LEAD notes shorter than this (thin_melody)
 bass_min_seconds             = 0.08      # drop BASS notes shorter than this (simplify_bass)
 harmony_rest_on_busy_melody  = false     # drop harmony notes that land on a melodic attack, giving the melody space
-lead_max_leap                = 12         # fold LEAD notes leaping > this many semitones toward octave continuity (de-jitters instrumental skyline leads); 0 = off
+lead_max_leap                = 0          # DISABLED: the fold chains toward the previous note and shifted real melody notes by up to 2 octaves, mangling the tune. Needs a non-chaining rework before re-enabling. 0 = off
 
 arrange_mode = "heuristic"   # "heuristic" | "ai" (LLM arranger); Score-affecting, forces a re-analyze
 

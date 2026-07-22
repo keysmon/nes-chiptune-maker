@@ -124,9 +124,11 @@ class ArrangeConfig:
     # re-analyze - see web/runtime.py::_ANALYSIS_ARRANGE_KEYS.
     arrange_mode: str = "heuristic"
     # Fold consecutive LEAD notes leaping more than this many semitones toward octave
-    # continuity - de-jitters the skyline lead on instrumentals (the "top voice" hops
-    # octaves between instruments). 0 = off. A vocal lead rarely trips it.
-    lead_max_leap: int = 12
+    # continuity. DISABLED by default (0): the current fold chains toward the previous
+    # note, which shifted genuine melody notes by up to 2 octaves and mangled the tune
+    # (it optimized a jump%% proxy, not the melody). Needs a non-chaining rework - fold
+    # only isolated single-note spikes against local context - before re-enabling.
+    lead_max_leap: int = 0
 
     def __post_init__(self) -> None:
         if self.bass_low >= self.bass_high:
