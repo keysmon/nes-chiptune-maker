@@ -35,7 +35,7 @@ harmony_rest_on_busy_melody  = false     # drop harmony notes that land on a mel
 lead_max_leap                = 0          # DISABLED: the fold chains toward the previous note and shifted real melody notes by up to 2 octaves, mangling the tune. Needs a non-chaining rework before re-enabling. 0 = off
 
 harmony_source   = "select"   # "select" (note-selection comp) | "arp" (legacy fixed arpeggio)
-select_min_gap   = 0.10       # seconds; minimum spacing between selected comp notes (sparsity budget)
+select_min_gap   = 0.30       # seconds; minimum spacing between selected comp notes (sparsity budget). 0.30 tuned by ear + metric: tames dense songs (topone) and lifts melody recall on all; lower = busier comp
 
 arrange_mode = "heuristic"   # "heuristic" | "ai" (LLM arranger); Score-affecting, forces a re-analyze
 

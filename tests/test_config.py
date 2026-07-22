@@ -261,7 +261,7 @@ def test_rejects_unknown_analysis_key(tmp_path):
 def test_arrange_config_has_harmony_source_and_min_gap():
     cfg = load_config(DEFAULT_CONFIG_PATH)
     assert cfg.arrange.harmony_source == "select"
-    assert cfg.arrange.select_min_gap == pytest.approx(0.10)
+    assert cfg.arrange.select_min_gap == pytest.approx(0.30)
 
 
 def test_invalid_harmony_source_rejected():
