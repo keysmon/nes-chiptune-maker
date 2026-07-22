@@ -153,6 +153,7 @@ def build_score(audio_path, cfg: Config, cache_dir=None) -> Score:
         other = transcribe_pitched(stems["other"], sr, Role.HARMONY, min_duration=a.min_note_seconds)
         lead, skyline_harmony = _skyline_lead(other)
 
+    chords = []  # detected chord progression; fed to the AI arranger so it sees the real harmony
     if arr.harmony_mode == "chords":
         chords = detect_chords(mono, orig_sr, grid, smooth_beats=arr.chord_smooth_beats)
         harmony = comp_chords(
@@ -203,7 +204,7 @@ def build_score(audio_path, cfg: Config, cache_dir=None) -> Score:
     if arr.arrange_mode == "ai":
         from chiptune.arrange.ai_arranger import arrange as ai_arrange
 
-        ai_score = ai_arrange(heuristic_score, cfg.ai, None, lambda: heuristic_score)
+        ai_score = ai_arrange(heuristic_score, cfg.ai, None, lambda: heuristic_score, chords=chords)
         _log_score_stats("ai", ai_score, cfg.frame_rate)
         return ai_score
     return heuristic_score

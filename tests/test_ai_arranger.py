@@ -49,3 +49,13 @@ def test_arrange_falls_back_on_unparseable_output(monkeypatch):
 def test_format_prompt_includes_the_melody():
     p = ai_arranger.format_prompt(_score())
     assert "MELODY" in p.upper() and "120" in p  # tempo present
+
+def test_format_prompt_includes_chords_and_bass():
+    # #1 informed AI: the detected chord progression + real bass line reach the LLM,
+    # so it arranges the actual harmony instead of guessing from the melody.
+    from chiptune.analysis.chords import ChordSegment
+    sc = Score(TempoGrid(120., 0., 4),
+               [NoteEvent(72, 0., 0.5, 100, Role.LEAD), NoteEvent(36, 0., 1.0, 100, Role.BASS)], 1.0)
+    p = ai_arranger.format_prompt(sc, [ChordSegment(0.0, 2.0, 0, False), ChordSegment(2.0, 4.0, 9, True)])
+    assert "CHORDS" in p and "C:" in p and "Am:" in p   # C major -> A minor progression present
+    assert "BASS" in p                                    # the real bass line is included
