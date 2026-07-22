@@ -63,7 +63,7 @@
       "percussion": null
     },
     {
-      "pitch": 62,
+      "pitch": 50,
       "start": 2.1026897959183675,
       "end": 2.3813292517006803,
       "velocity": 74,
@@ -79,7 +79,7 @@
       "percussion": null
     },
     {
-      "pitch": 60,
+      "pitch": 48,
       "start": 2.5438689342403626,
       "end": 2.6831886621315193,
       "velocity": 72,
@@ -231,7 +231,7 @@
       "percussion": null
     },
     {
-      "pitch": 60,
+      "pitch": 48,
       "start": 9.74590657596372,
       "end": 9.885226303854875,
       "velocity": 75,
@@ -287,7 +287,7 @@
       "percussion": null
     },
     {
-      "pitch": 62,
+      "pitch": 50,
       "start": 11.82537641723356,
       "end": 11.9892,
       "velocity": 72,
@@ -303,7 +303,7 @@
       "percussion": null
     },
     {
-      "pitch": 60,
+      "pitch": 48,
       "start": 12.14012970521542,
       "end": 12.279449433106576,
       "velocity": 72,
@@ -559,7 +559,7 @@
       "percussion": null
     },
     {
-      "pitch": 55,
+      "pitch": 67,
       "start": 25.081347845804988,
       "end": 25.31354739229025,
       "velocity": 40,
@@ -567,7 +567,7 @@
       "percussion": null
     },
     {
-      "pitch": 60,
+      "pitch": 72,
       "start": 25.371597278911565,
       "end": 25.522526984126984,
       "velocity": 55,
@@ -639,7 +639,7 @@
       "percussion": null
     },
     {
-      "pitch": 62,
+      "pitch": 74,
       "start": 29.600196825396825,
       "end": 29.76273650793651,
       "velocity": 51,
@@ -671,7 +671,7 @@
       "percussion": null
     },
     {
-      "pitch": 50,
+      "pitch": 62,
       "start": 2.2523356009070294,
       "end": 2.5541950113378684,
       "velocity": 80,
@@ -1271,7 +1271,7 @@
       "percussion": null
     },
     {
-      "pitch": 67,
+      "pitch": 55,
       "start": 24.891791383219964,
       "end": 25.193650793650804,
       "velocity": 80,
@@ -1279,7 +1279,7 @@
       "percussion": null
     },
     {
-      "pitch": 48,
+      "pitch": 60,
       "start": 25.193650793650804,
       "end": 25.495510204081643,
       "velocity": 80,
@@ -1391,7 +1391,7 @@
       "percussion": null
     },
     {
-      "pitch": 73,
+      "pitch": 61,
       "start": 29.41968253968254,
       "end": 29.72154195011338,
       "velocity": 80,

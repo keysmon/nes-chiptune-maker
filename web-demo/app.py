@@ -94,6 +94,11 @@ def index():
     return FileResponse(os.path.join(_STATIC, "index.html"))
 
 
+@app.get("/compare")
+def compare():
+    return FileResponse(os.path.join(_STATIC, "compare.html"))
+
+
 @app.get("/original/{song}")
 def original(song: str):
     if not _SLUG.match(song):

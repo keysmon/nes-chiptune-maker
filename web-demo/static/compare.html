@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang=en>
+<head>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Chiptune melody test</title>
+<style>
+:root{--bg:#0d0f1a;--panel:#161a2b;--fg:#e8e8f0;--mut:#8a90b0;--grid:#2a2d42;--accent:#39ff9e}
+*{box-sizing:border-box}
+body{margin:0 auto;max-width:720px;background:var(--bg);color:var(--fg);font-family:ui-monospace,Menlo,monospace;padding:22px;line-height:1.55}
+h1{font-size:20px}.tag{color:var(--accent)}
+.q{background:#1d2233;border:1px solid var(--grid);border-left:3px solid var(--accent);border-radius:8px;padding:14px 16px;margin:16px 0;font-size:14px}
+.q b{color:var(--accent)}
+.card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 18px;margin-bottom:18px}
+.card h2{font-size:15px;margin:0 0 4px}.card .sub{color:var(--mut);font-size:12px;margin-bottom:12px}
+.row{margin:10px 0}.lbl{font-size:12.5px;color:var(--mut);margin-bottom:3px}.lbl.key{color:var(--accent);font-weight:600}
+audio{width:100%;filter:invert(.92) hue-rotate(180deg)}
+.st{font-size:12px;color:var(--mut)}
+</style>
+</head>
+<body>
+<h1>Chiptune <span class=tag>melody-forward</span> test</h1>
+<div class=q>
+New idea: <b>melody-forward</b> = push the lead voice way up, pull the chords &amp; drums right down, so the tune carries the track instead of being buried.
+<b>Question: does the &#9733; melody-forward version sound like the actual song</b> (more than the "full" version does)?
+</div>
+
+<div class=card>
+  <h2>1. Saboteurs &mdash; Josh Woodward</h2><div class=sub>dark rock &middot; its melody extraction works, so this is the real test of melody-forward</div>
+  <div class=row><div class=lbl>Original</div><audio id=saboteurs-orig controls preload=none></audio></div>
+  <div class=row><div class=lbl>Full chiptune (backing drowns the melody)</div><audio id=saboteurs-full controls></audio></div>
+  <div class=row><div class="lbl key">&#9733; Melody-forward (lead up, backing down)</div><audio id=saboteurs-fwd controls></audio></div>
+  <div class=row><div class=lbl>Lead-only (for reference)</div><audio id=saboteurs-lead controls></audio></div>
+</div>
+
+<div class=card>
+  <h2>2. Feldman &mdash; &ldquo;I Saw You Today&rdquo;</h2><div class=sub>folk ballad &middot; melody extraction is choppy on this one, so melody-forward helps less</div>
+  <div class=row><div class=lbl>Original</div><audio id=feldman-orig controls preload=none></audio></div>
+  <div class=row><div class=lbl>Full chiptune</div><audio id=feldman-full controls></audio></div>
+  <div class=row><div class="lbl key">&#9733; Melody-forward</div><audio id=feldman-fwd controls></audio></div>
+  <div class=row><div class=lbl>Lead-only (for reference)</div><audio id=feldman-lead controls></audio></div>
+</div>
+
+<div class=st id=status>Rendering ...</div>
+<script>
+const $=s=>document.querySelector(s);
+const FWD={levels:{pulse1:1.7,pulse2:0.25,triangle:0.7,noise:0.25}};   // melody-forward mix
+const LEAD={levels:{pulse2:0,triangle:0,noise:0}};                      // lead alone
+async function render(song,overrides){
+  const r=await fetch('/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({song,harmony:'chords',overrides})});
+  if(!r.ok) throw new Error(await r.text());
+  return URL.createObjectURL(await r.blob());
+}
+(async()=>{
+  try{
+    for(const s of ['saboteurs','feldman']){
+      $('#'+s+'-orig').src='/original/'+s;
+      $('#'+s+'-full').src=await render(s,{});
+      $('#'+s+'-fwd').src =await render(s,FWD);
+      $('#'+s+'-lead').src=await render(s,LEAD);
+    }
+    $('#status').textContent='Ready. The key comparison is Full vs ★ Melody-forward.';
+  }catch(e){ $('#status').textContent='Error: '+e; }
+})();
+</script>
+</body>
+</html>

@@ -100,7 +100,7 @@ priority = 1
 pulse1 = 1.0
 pulse2 = 0.85
 triangle = 1.0
-noise = 0.6                        # was 0.7; drums sit back a little (they read as "a little loud")
+noise = 0.6
 
 # Audio -> Score analysis taste knobs (Demucs separation, transcription, drum
 # classification). Nothing tasteful is hardcoded in Python here either.
