@@ -41,6 +41,7 @@ VALID_ARRANGE_KEYS = frozenset({
     "bass_min_seconds",
     "harmony_rest_on_busy_melody",
     "arrange_mode",
+    "lead_max_leap",
 })
 VALID_ARRANGE_MODES = frozenset({"heuristic", "ai"})
 VALID_AI_KEYS = frozenset({
@@ -122,6 +123,10 @@ class ArrangeConfig:
     # arranger (chiptune.arrange.ai_arranger), Score-affecting so it forces a
     # re-analyze - see web/runtime.py::_ANALYSIS_ARRANGE_KEYS.
     arrange_mode: str = "heuristic"
+    # Fold consecutive LEAD notes leaping more than this many semitones toward octave
+    # continuity - de-jitters the skyline lead on instrumentals (the "top voice" hops
+    # octaves between instruments). 0 = off. A vocal lead rarely trips it.
+    lead_max_leap: int = 12
 
     def __post_init__(self) -> None:
         if self.bass_low >= self.bass_high:
@@ -132,6 +137,8 @@ class ArrangeConfig:
             raise ValueError(f"velocity_floor must be in [0, 1], got {self.velocity_floor}")
         if self.reattack_gap < 0:
             raise ValueError(f"reattack_gap must be >= 0, got {self.reattack_gap}")
+        if self.lead_max_leap < 0:
+            raise ValueError(f"lead_max_leap must be >= 0, got {self.lead_max_leap}")
         if self.harmony_mode not in VALID_HARMONY_MODES:
             raise ValueError(
                 f"harmony_mode {self.harmony_mode!r} must be one of {sorted(VALID_HARMONY_MODES)}"

@@ -80,6 +80,28 @@ def _skyline_lead(notes: list[NoteEvent]) -> tuple[list[NoteEvent], list[NoteEve
     return lead, harmony
 
 
+def smooth_lead_leaps(lead: list[NoteEvent], max_leap: int) -> list[NoteEvent]:
+    """Fold each LEAD note toward the previous one when they leap more than `max_leap`
+    semitones apart, in whole octaves - de-jitters the skyline lead on instrumentals
+    (the momentary top voice hops octaves between instruments). Pure NoteEvent
+    transform; preserves pitch class and sub-`max_leap` melodic leaps. 0 = off.
+    """
+    if max_leap <= 0 or not lead:
+        return lead
+    out: list[NoteEvent] = []
+    prev = None
+    for n in sorted(lead, key=lambda x: x.start):
+        p = n.pitch
+        if prev is not None:
+            while p - prev > max_leap and p - 12 >= 0:
+                p -= 12
+            while prev - p > max_leap and p + 12 <= 127:
+                p += 12
+        out.append(n if p == n.pitch else replace(n, pitch=p))
+        prev = p
+    return out
+
+
 def declash_harmony(notes: list[NoteEvent], declash_semitones: int) -> list[NoteEvent]:
     """Push each HARMONY note that overlaps a LEAD note within `declash_semitones`
     down one octave (pitch - 12). Pure transform: leads and non-clashing notes
@@ -174,6 +196,7 @@ def build_score(audio_path, cfg: Config, cache_dir=None) -> Score:
     else:
         raise ValueError(f"unknown [arrange].harmony_mode: {arr.harmony_mode!r}")
 
+    lead = smooth_lead_leaps(lead, arr.lead_max_leap)
     lead = thin_melody(lead, arr.melody_min_seconds)
     bass = simplify_bass(bass, arr.bass_min_seconds)
     if arr.harmony_rest_on_busy_melody:

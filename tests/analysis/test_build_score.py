@@ -6,7 +6,7 @@ import numpy as np
 import soundfile as sf
 
 from chiptune.analysis import build_score as bs
-from chiptune.analysis.build_score import build_score, declash_harmony
+from chiptune.analysis.build_score import build_score, declash_harmony, smooth_lead_leaps
 from chiptune.config import load_config
 from chiptune.score import NoteEvent, Percussion, Role, TempoGrid
 
@@ -30,6 +30,15 @@ def _patch_common(monkeypatch):
         lambda mono, sr, beats_per_bar=4: TempoGrid(bpm=120.0, offset=0.0, beats_per_bar=beats_per_bar),
     )
 
+
+def test_smooth_lead_leaps_folds_octave_jumps():
+    # A >octave artifact jump (60 -> 84) is folded toward the previous note; sub-octave
+    # leaps and pitch class are preserved, and max_leap=0 is a no-op.
+    lead = [NoteEvent(60, 0., .5, 100, Role.LEAD),
+            NoteEvent(84, .5, 1., 100, Role.LEAD),   # 2 octaves up = skyline artifact
+            NoteEvent(62, 1., 1.5, 100, Role.LEAD)]
+    assert [n.pitch for n in smooth_lead_leaps(lead, 12)] == [60, 72, 62]  # 84 -> 72 (within an octave)
+    assert [n.pitch for n in smooth_lead_leaps(lead, 0)] == [60, 84, 62]   # off = unchanged
 
 def test_build_score_assembles_all_roles(monkeypatch, tmp_path):
     audio = tmp_path / "song.wav"
