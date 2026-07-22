@@ -36,6 +36,7 @@ _ANALYSIS_ARRANGE_KEYS = frozenset({
     "harmony_mode", "chord_comp_pattern", "chord_subdivision", "chord_octave",
     "chord_tones", "chord_smooth_beats", "melody_min_seconds", "bass_min_seconds",
     "harmony_rest_on_busy_melody", "arrange_mode", "lead_max_leap",
+    "harmony_source", "select_min_gap",
 })
 # [arrange] keys consumed only by quantize/allocate/synth (a change re-renders from
 # the cached Score). Kept explicit + partition-tested against ArrangeConfig so that
