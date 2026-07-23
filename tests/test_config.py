@@ -320,3 +320,13 @@ def test_echo_rejects_unknown_key():
     raw["echo"]["delayy_frames"] = 4
     with pytest.raises(ValueError, match="delayy_frames"):
         config_from_dict(raw)
+
+
+def test_echo_accepts_boundary_values():
+    # Accept-at-boundary: locks the validator bounds (< vs <=) so an off-by-one
+    # in EchoConfig.__post_init__ would fail a test, not slip through.
+    from chiptune.config import EchoConfig
+    assert EchoConfig(delay_frames=1).delay_frames == 1              # delay_frames >= 1
+    assert EchoConfig(volume=0.0).volume == 0.0                      # volume >= 0.0
+    assert EchoConfig(volume=1.0).volume == 1.0                      # volume <= 1.0
+    assert EchoConfig(min_lead_seconds=0.0).min_lead_seconds == 0.0  # min_lead_seconds >= 0
