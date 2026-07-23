@@ -17,5 +17,10 @@ clipped to ~30 s for the playground. Attribution is required for the CC-BY track
 | saboteurs | Saboteurs | Josh Woodward | CC BY 4.0 | https://www.joshwoodward.com/song/Saboteurs |
 | feldman | I Saw You Today | Bob A. Feldman | CC0 1.0 (public domain) | https://freemusicarchive.org/music/bob-a-feldman-33/single/i-saw-you-today/ |
 | topone | What I Want | The Top One Percent | CC BY 4.0 | https://freemusicarchive.org/music/the-top-one-percent/single/what-i-want/ |
+| molihua | 茉莉花 (Jasmine Flower) | Traditional, arr. | Public domain (composition) | https://en.wikipedia.org/wiki/Mo_Li_Hua |
+| songbie | 送别 (Farewell) | Li Shutong / J.P. Ordway melody | Public domain (composition) | https://zh.wikipedia.org/wiki/送別_(歌曲) |
 
 CC BY: https://creativecommons.org/licenses/by/3.0/ · CC0: https://creativecommons.org/publicdomain/zero/1.0/
+
+The 茉莉花 / 送别 tracks are public-domain folk melodies arranged for the NES; there is no
+third-party recording, so their "Original" reference is a synthesized music box.
