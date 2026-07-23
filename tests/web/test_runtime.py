@@ -48,3 +48,19 @@ def test_every_arrange_field_is_classified_analysis_or_synthesis():
         f"unclassified arrange fields: {all_fields ^ classified} - add each to "
         "_ANALYSIS_ARRANGE_KEYS or _SYNTHESIS_ARRANGE_KEYS in web/runtime.py"
     )
+
+
+def test_echo_change_flips_the_analysis_signature():
+    base = config_from_overrides({})
+    echoed = config_from_overrides({"echo": {"enabled": True}})
+    assert _analysis_signature(echoed) != _analysis_signature(base), (
+        "toggling [echo] must re-analyze (it changes the Score's HARMONY list)"
+    )
+
+
+def test_synthesis_change_still_keeps_signature_stable_with_echo_in_the_blob():
+    base = config_from_overrides({})
+    synth = config_from_overrides({"levels": {"noise": 0.2}})
+    assert _analysis_signature(synth) == _analysis_signature(base), (
+        "a synthesis-only change must not re-analyze even though echo is now hashed"
+    )

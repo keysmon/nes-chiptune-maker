@@ -57,7 +57,8 @@ def _analysis_signature(cfg: Config) -> str:
         k: getattr(cfg.analysis, k)
         for k in sorted(vars(cfg.analysis)) if not k.startswith("_")
     }
-    blob = json.dumps({"arrange": arr, "analysis": ana}, default=str, sort_keys=True)
+    echo = {k: getattr(cfg.echo, k) for k in sorted(vars(cfg.echo)) if not k.startswith("_")}
+    blob = json.dumps({"arrange": arr, "analysis": ana, "echo": echo}, default=str, sort_keys=True)
     return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
 
