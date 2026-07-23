@@ -12,28 +12,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..score import NoteEvent, Role
+from .monophony import enforce_monophonic
 
 if TYPE_CHECKING:
     from ..config import EchoConfig
-
-
-def _enforce_mono(notes: list[NoteEvent]) -> list[NoteEvent]:
-    """Sort by start and clamp each note's end to the next note's start, dropping
-    any note that collapses to zero length. Guarantees strict monophony.
-
-    Deliberately mirrors comp_select._enforce_mono; kept separate rather than
-    shared so the two modules' monophony rules can evolve independently.
-    """
-    ordered = sorted(notes, key=lambda n: n.start)
-    out: list[NoteEvent] = []
-    for i, n in enumerate(ordered):
-        end = n.end
-        if i + 1 < len(ordered):
-            end = min(end, ordered[i + 1].start)
-        if end > n.start:
-            out.append(NoteEvent(pitch=n.pitch, start=n.start, end=end,
-                                 velocity=n.velocity, role=Role.HARMONY))
-    return out
 
 
 def _clamp_to_gap(echo: NoteEvent, comp: list[NoteEvent]) -> NoteEvent | None:
@@ -89,4 +71,4 @@ def add_phantom_echo(
         clamped = _clamp_to_gap(cand, comp)
         if clamped is not None:
             echoes.append(clamped)
-    return _enforce_mono(comp + echoes)
+    return enforce_monophonic(comp + echoes)

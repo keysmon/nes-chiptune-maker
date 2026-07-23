@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from ..score import NoteEvent, Role, TempoGrid
 from ..analysis.chords import ChordSegment
+from .monophony import enforce_monophonic
 
 _HARMONY_VELOCITY = 80
 # Taste-tunable ranking weights for `_importance`. Kept in code (not
@@ -69,21 +70,6 @@ def _voice_lead(pitch: int, prev: int | None) -> int:
     while best + 12 <= 127 and abs((best + 12) - prev) < abs(best - prev):
         best += 12
     return best
-
-
-def _enforce_mono(notes: list[NoteEvent]) -> list[NoteEvent]:
-    """Sort by start and clamp each note's end to the next note's start, dropping
-    any note that collapses to zero length. Guarantees strict monophony."""
-    ordered = sorted(notes, key=lambda n: n.start)
-    out: list[NoteEvent] = []
-    for i, n in enumerate(ordered):
-        end = n.end
-        if i + 1 < len(ordered):
-            end = min(end, ordered[i + 1].start)
-        if end > n.start:
-            out.append(NoteEvent(pitch=n.pitch, start=n.start, end=end,
-                                 velocity=n.velocity, role=Role.HARMONY))
-    return out
 
 
 def select_comp(
@@ -151,4 +137,4 @@ def select_comp(
         emitted.append(NoteEvent(pitch=pitch, start=c.start, end=end,
                                  velocity=_HARMONY_VELOCITY, role=Role.HARMONY))
         prev_pitch = pitch
-    return _enforce_mono(emitted)
+    return enforce_monophonic(emitted)
