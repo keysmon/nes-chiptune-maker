@@ -69,6 +69,7 @@ VALID_ANALYSIS_KEYS = frozenset({
     "harmony_declash",
     "declash_semitones",
 })
+VALID_ECHO_KEYS = frozenset({"enabled", "delay_frames", "volume", "min_lead_seconds"})
 
 
 @dataclass(frozen=True)
@@ -197,6 +198,31 @@ class VibratoConfig:
 
 
 @dataclass(frozen=True)
+class EchoConfig:
+    """Phantom echo: the lead melody re-used on the harmony channel, delayed, to
+    fill the comp's rests so a thin lead reads fuller. Opt-in (disabled by
+    default). See chiptune.arrange.phantom_echo and the design doc.
+
+    `volume` scales the echo's note velocity; note that Pulse 2 is envelope-only
+    today (the allocator does not scale HARMONY by velocity), so `volume` is
+    latent - it becomes audible once harmony-velocity threading lands. The
+    delayed gap-filling still works now.
+    """
+    enabled: bool = False
+    delay_frames: int = 4
+    volume: float = 0.5
+    min_lead_seconds: float = 0.12
+
+    def __post_init__(self) -> None:
+        if self.delay_frames < 1:
+            raise ValueError(f"delay_frames must be >= 1, got {self.delay_frames}")
+        if not 0.0 <= self.volume <= 1.0:
+            raise ValueError(f"volume must be in [0, 1], got {self.volume}")
+        if self.min_lead_seconds < 0:
+            raise ValueError(f"min_lead_seconds must be >= 0, got {self.min_lead_seconds}")
+
+
+@dataclass(frozen=True)
 class DrumVoice:
     period_index: int
     mode: str
@@ -287,6 +313,7 @@ class Config:
     output_lowpass_hz: float = 0.0   # gentle top-end rolloff on the final mix; 0 = off
     drums: dict[str, DrumVoice] = field(default_factory=dict)
     levels: dict[str, float] = field(default_factory=dict)
+    echo: EchoConfig = field(default_factory=EchoConfig)
 
 
 _T = TypeVar("_T", bound=ChannelConfig)
@@ -366,6 +393,14 @@ def config_from_dict(raw: dict, source: str = "config") -> Config:
             f"ai must be one of {sorted(VALID_AI_KEYS)}"
         )
 
+    raw_echo = raw.get("echo", {})
+    bad_echo = set(raw_echo) - VALID_ECHO_KEYS
+    if bad_echo:
+        raise ValueError(
+            f"config {path} has unknown [echo] key {sorted(bad_echo)[0]!r}; "
+            f"echo must be one of {sorted(VALID_ECHO_KEYS)}"
+        )
+
     return Config(
         sample_rate=raw["sample_rate"],
         frame_rate=raw["frame_rate"],
@@ -382,6 +417,7 @@ def config_from_dict(raw: dict, source: str = "config") -> Config:
         output_lowpass_hz=raw.get("output_lowpass_hz", 0.0),
         drums=drums,
         levels=raw_levels,
+        echo=EchoConfig(**raw_echo),
     )
 
 

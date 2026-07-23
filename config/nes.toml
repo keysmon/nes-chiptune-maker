@@ -39,6 +39,12 @@ select_min_gap   = 0.30       # seconds; minimum spacing between selected comp n
 
 arrange_mode = "heuristic"   # "heuristic" | "ai" (LLM arranger); Score-affecting, forces a re-analyze
 
+[echo]                    # phantom echo: the lead re-used on the harmony channel, delayed, to fill the comp's rests (opt-in)
+enabled          = false  # opt-in; ear-check before flipping the default
+delay_frames     = 4      # frames the echo trails the lead (~0.067s at 60fps); the "a few rows late" idiom
+volume           = 0.5    # echo velocity as a fraction of the lead's. LATENT: Pulse 2 is envelope-only today (see EchoConfig)
+min_lead_seconds = 0.12   # only lead notes longer than this get an echo (skip short/passing notes)
+
 # LLM arranger connection (opt-in via arrange_mode="ai"), OpenAI-compatible so any
 # provider works by swapping base_url/model (e.g. a local Ollama server).
 [ai]

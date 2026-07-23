@@ -276,3 +276,47 @@ def test_negative_min_gap_rejected():
     raw["arrange"]["select_min_gap"] = -0.1
     with pytest.raises(ValueError, match="select_min_gap"):
         config_from_dict(raw)
+
+
+def test_echo_section_loads_disabled_by_default():
+    cfg = load_config(DEFAULT_CONFIG_PATH)
+    assert cfg.echo.enabled is False
+    assert cfg.echo.delay_frames == 4
+    assert cfg.echo.volume == pytest.approx(0.5)
+    assert cfg.echo.min_lead_seconds == pytest.approx(0.12)
+
+
+def test_echo_section_missing_falls_back_to_disabled_defaults():
+    raw = default_raw_config()
+    del raw["echo"]
+    cfg = config_from_dict(raw)
+    assert cfg.echo.enabled is False
+    assert cfg.echo.delay_frames == 4
+
+
+def test_echo_rejects_delay_frames_below_one():
+    raw = default_raw_config()
+    raw["echo"]["delay_frames"] = 0
+    with pytest.raises(ValueError, match="delay_frames"):
+        config_from_dict(raw)
+
+
+def test_echo_rejects_volume_out_of_range():
+    raw = default_raw_config()
+    raw["echo"]["volume"] = 1.5
+    with pytest.raises(ValueError, match="volume"):
+        config_from_dict(raw)
+
+
+def test_echo_rejects_negative_min_lead_seconds():
+    raw = default_raw_config()
+    raw["echo"]["min_lead_seconds"] = -0.01
+    with pytest.raises(ValueError, match="min_lead_seconds"):
+        config_from_dict(raw)
+
+
+def test_echo_rejects_unknown_key():
+    raw = default_raw_config()
+    raw["echo"]["delayy_frames"] = 4
+    with pytest.raises(ValueError, match="delayy_frames"):
+        config_from_dict(raw)
