@@ -200,15 +200,16 @@ class VibratoConfig:
 @dataclass(frozen=True)
 class EchoConfig:
     """Phantom echo: the lead melody re-used on the harmony channel, delayed, to
-    fill the comp's rests so a thin lead reads fuller. Opt-in (disabled by
-    default). See chiptune.arrange.phantom_echo and the design doc.
+    fill the comp's rests so a thin lead reads fuller. On by default (ear-check
+    confirmed it reads fuller); set enabled=false to turn it off. See
+    chiptune.arrange.phantom_echo and the design doc.
 
     `volume` scales the echo's note velocity; note that Pulse 2 is envelope-only
     today (the allocator does not scale HARMONY by velocity), so `volume` is
     latent - it becomes audible once harmony-velocity threading lands. The
     delayed gap-filling still works now.
     """
-    enabled: bool = False
+    enabled: bool = True
     delay_frames: int = 4
     volume: float = 0.5
     min_lead_seconds: float = 0.12

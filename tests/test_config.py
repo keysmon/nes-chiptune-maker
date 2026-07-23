@@ -278,19 +278,19 @@ def test_negative_min_gap_rejected():
         config_from_dict(raw)
 
 
-def test_echo_section_loads_disabled_by_default():
+def test_echo_section_loads_enabled_by_default():
     cfg = load_config(DEFAULT_CONFIG_PATH)
-    assert cfg.echo.enabled is False
+    assert cfg.echo.enabled is True
     assert cfg.echo.delay_frames == 4
     assert cfg.echo.volume == pytest.approx(0.5)
     assert cfg.echo.min_lead_seconds == pytest.approx(0.12)
 
 
-def test_echo_section_missing_falls_back_to_disabled_defaults():
+def test_echo_section_missing_falls_back_to_default_echoconfig():
     raw = default_raw_config()
     del raw["echo"]
     cfg = config_from_dict(raw)
-    assert cfg.echo.enabled is False
+    assert cfg.echo.enabled is True  # EchoConfig default (echo is on by default)
     assert cfg.echo.delay_frames == 4
 
 

@@ -51,9 +51,9 @@ def test_every_arrange_field_is_classified_analysis_or_synthesis():
 
 
 def test_echo_change_flips_the_analysis_signature():
-    base = config_from_overrides({})
-    echoed = config_from_overrides({"echo": {"enabled": True}})
-    assert _analysis_signature(echoed) != _analysis_signature(base), (
+    on = config_from_overrides({"echo": {"enabled": True}})
+    off = config_from_overrides({"echo": {"enabled": False}})
+    assert _analysis_signature(on) != _analysis_signature(off), (
         "toggling [echo] must re-analyze (it changes the Score's HARMONY list)"
     )
 

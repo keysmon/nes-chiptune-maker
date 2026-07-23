@@ -129,6 +129,7 @@ def test_harmony_mode_chords_yields_far_fewer_notes_than_transcribe(monkeypatch,
     )
 
     cfg = load_config()
+    cfg = replace(cfg, echo=replace(cfg.echo, enabled=False))  # isolate mode density; echo has its own tests
     chords_cfg = replace(cfg, arrange=replace(cfg.arrange, harmony_mode="chords"))
     transcribe_cfg = replace(cfg, arrange=replace(cfg.arrange, harmony_mode="transcribe"))
 
@@ -243,6 +244,7 @@ def test_chords_mode_discards_skyline_harmony_half(monkeypatch, tmp_path):
         cfg,
         analysis=replace(cfg.analysis, include_vocals=False),
         arrange=replace(cfg.arrange, harmony_source="arp"),
+        echo=replace(cfg.echo, enabled=False),  # isolate skyline-discard; echo has its own tests
     )
     score = build_score(audio, cfg)
 
@@ -443,11 +445,12 @@ def test_phantom_echo_disabled_leaves_harmony_identical_to_the_comp(monkeypatch,
         lambda stem, sr, fmin, fmax, min_duration=0.06: [NoteEvent(67, 0.0, 0.5, 80, Role.LEAD)],
     )
 
-    cfg = load_config()  # echo disabled by default
+    cfg = load_config()
     cfg = replace(
         cfg,
         arrange=replace(cfg.arrange, harmony_mode="transcribe"),
         analysis=replace(cfg.analysis, harmony_declash=False),
+        echo=replace(cfg.echo, enabled=False),  # this test IS the echo-disabled no-op check
     )
     score = build_score(audio, cfg)
     harm = score.notes_with_role(Role.HARMONY)
