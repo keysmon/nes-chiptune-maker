@@ -102,6 +102,13 @@ cycles, bass octave range, quantization strength, drum voicing, drum collision
 priority, channel levels. Nothing tasteful is hardcoded, so changing how it
 sounds never means changing Python.
 
+**Phantom echo** (`[echo]` in `config/nes.toml`, on by default) fills the harmony
+channel's rests with a delayed copy of the lead melody, so a thin single-square-wave
+lead reads fuller - the melody echoing back on itself. Each echo lands only in the
+gaps between comp notes (the comp always wins the channel) and the result stays
+monophonic. Turn it off with `enabled = false`, or tune `delay_frames` (how far it
+trails), `volume`, and `min_lead_seconds` (skip short passing notes).
+
 ## Status
 
 Both halves complete and merged:
