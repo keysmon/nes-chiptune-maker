@@ -4,7 +4,7 @@
     "offset": 0.6501587301587302,
     "beats_per_bar": 4
   },
-  "duration": 30.046621315192745,
+  "duration": 30.11328798185941,
   "notes": [
     {
       "pitch": 62,
@@ -703,6 +703,14 @@
       "percussion": null
     },
     {
+      "pitch": 50,
+      "start": 0.29886621315192746,
+      "end": 0.5542857142857143,
+      "velocity": 25,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
       "pitch": 62,
       "start": 0.6501587301587302,
       "end": 1.1435827664399092,
@@ -1179,6 +1187,14 @@
       "start": 29.762176870748302,
       "end": 30.0,
       "velocity": 80,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
+      "pitch": 64,
+      "start": 30.0,
+      "end": 30.11328798185941,
+      "velocity": 58,
       "role": "harmony",
       "percussion": null
     },

@@ -559,6 +559,14 @@
       "percussion": null
     },
     {
+      "pitch": 41,
+      "start": 4.40018140589569,
+      "end": 4.400181405895692,
+      "velocity": 46,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
       "pitch": 70,
       "start": 4.400181405895692,
       "end": 4.673015873015873,
@@ -911,6 +919,14 @@
       "percussion": null
     },
     {
+      "pitch": 58,
+      "start": 16.404897959183675,
+      "end": 16.40489795918368,
+      "velocity": 44,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
       "pitch": 63,
       "start": 16.40489795918368,
       "end": 16.67773242630386,
@@ -1007,6 +1023,14 @@
       "percussion": null
     },
     {
+      "pitch": 41,
+      "start": 19.678911564625842,
+      "end": 19.678911564625853,
+      "velocity": 33,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
       "pitch": 70,
       "start": 19.678911564625853,
       "end": 19.951746031746033,
@@ -1051,6 +1075,14 @@
       "start": 21.043083900226755,
       "end": 21.315918367346935,
       "velocity": 80,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
+      "pitch": 41,
+      "start": 21.315918367346935,
+      "end": 21.315918367346942,
+      "velocity": 34,
       "role": "harmony",
       "percussion": null
     },

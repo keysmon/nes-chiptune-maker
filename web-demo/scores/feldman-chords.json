@@ -935,6 +935,14 @@
       "percussion": null
     },
     {
+      "pitch": 43,
+      "start": 9.798820861678003,
+      "end": 9.798820861678005,
+      "velocity": 28,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
       "pitch": 67,
       "start": 9.798820861678005,
       "end": 10.12390022675737,
@@ -1031,6 +1039,14 @@
       "percussion": null
     },
     {
+      "pitch": 41,
+      "start": 13.69977324263038,
+      "end": 13.699773242630384,
+      "velocity": 45,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
       "pitch": 65,
       "start": 13.699773242630384,
       "end": 14.024852607709748,
@@ -1043,6 +1059,14 @@
       "start": 14.024852607709748,
       "end": 14.349931972789113,
       "velocity": 80,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
+      "pitch": 41,
+      "start": 14.349931972789113,
+      "end": 14.349931972789115,
+      "velocity": 42,
       "role": "harmony",
       "percussion": null
     },
@@ -1107,6 +1131,14 @@
       "start": 16.625487528344667,
       "end": 16.950566893424032,
       "velocity": 80,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
+      "pitch": 30,
+      "start": 16.950566893424032,
+      "end": 16.950566893424035,
+      "velocity": 8,
       "role": "harmony",
       "percussion": null
     },
@@ -1240,6 +1272,14 @@
     },
     {
       "pitch": 48,
+      "start": 22.15183673469387,
+      "end": 22.151836734693877,
+      "velocity": 46,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
+      "pitch": 48,
       "start": 22.151836734693877,
       "end": 22.47691609977324,
       "velocity": 80,
@@ -1347,6 +1387,14 @@
       "start": 26.377868480725617,
       "end": 26.70294784580498,
       "velocity": 80,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
+      "pitch": 55,
+      "start": 26.70294784580498,
+      "end": 26.70294784580499,
+      "velocity": 26,
       "role": "harmony",
       "percussion": null
     },

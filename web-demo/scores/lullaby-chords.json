@@ -359,6 +359,14 @@
       "percussion": null
     },
     {
+      "pitch": 49,
+      "start": 0.24081632653061225,
+      "end": 0.33668934240362813,
+      "velocity": 50,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
       "pitch": 71,
       "start": 0.33668934240362813,
       "end": 0.6791836734693877,
@@ -371,6 +379,14 @@
       "start": 0.6791836734693877,
       "end": 1.0216780045351472,
       "velocity": 80,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
+      "pitch": 47,
+      "start": 1.0216780045351472,
+      "end": 1.0216780045351475,
+      "velocity": 48,
       "role": "harmony",
       "percussion": null
     },

@@ -1248,6 +1248,14 @@
     },
     {
       "pitch": 48,
+      "start": 17.240816326530602,
+      "end": 17.240816326530613,
+      "velocity": 50,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
+      "pitch": 48,
       "start": 17.240816326530613,
       "end": 17.46140589569161,
       "velocity": 80,
@@ -1291,6 +1299,14 @@
       "start": 18.343764172335593,
       "end": 18.56435374149659,
       "velocity": 80,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
+      "pitch": 48,
+      "start": 18.56435374149659,
+      "end": 18.564353741496596,
+      "velocity": 48,
       "role": "harmony",
       "percussion": null
     },
@@ -1355,6 +1371,14 @@
       "start": 20.10848072562357,
       "end": 20.329070294784565,
       "velocity": 80,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
+      "pitch": 43,
+      "start": 20.329070294784565,
+      "end": 20.32907029478458,
+      "velocity": 41,
       "role": "harmony",
       "percussion": null
     },
@@ -1439,6 +1463,14 @@
       "percussion": null
     },
     {
+      "pitch": 58,
+      "start": 22.53496598639454,
+      "end": 22.534965986394557,
+      "velocity": 38,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
       "pitch": 63,
       "start": 22.534965986394557,
       "end": 22.755555555555553,
@@ -1467,6 +1499,14 @@
       "start": 23.196734693877545,
       "end": 23.41732426303854,
       "velocity": 80,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
+      "pitch": 42,
+      "start": 23.41732426303854,
+      "end": 23.417324263038548,
+      "velocity": 20,
       "role": "harmony",
       "percussion": null
     },
@@ -1691,6 +1731,14 @@
       "start": 29.37324263038544,
       "end": 29.593832199546437,
       "velocity": 80,
+      "role": "harmony",
+      "percussion": null
+    },
+    {
+      "pitch": 51,
+      "start": 29.593832199546437,
+      "end": 29.593832199546483,
+      "velocity": 28,
       "role": "harmony",
       "percussion": null
     },
