@@ -224,6 +224,10 @@ def build_score(audio_path, cfg: Config, cache_dir=None) -> Score:
     if arr.harmony_rest_on_busy_melody:
         harmony = rest_harmony_on_busy_melody(harmony, lead)
 
+    if cfg.echo.enabled:
+        from chiptune.arrange.phantom_echo import add_phantom_echo
+        harmony = add_phantom_echo(lead, harmony, cfg.echo, cfg.frame_rate)
+
     notes = lead + harmony + bass + drums
     declash_pushed = 0
     if a.harmony_declash:

@@ -383,3 +383,106 @@ def test_heuristic_mode_unchanged(monkeypatch, tmp_path):
     score = build_score(audio, cfg)
 
     assert 67 in [n.pitch for n in score.notes_with_role(Role.LEAD)]  # untouched by AI
+
+
+def test_phantom_echo_adds_harmony_only_in_gaps_when_enabled(monkeypatch, tmp_path):
+    """[echo].enabled=true adds delayed lead echoes to HARMONY (filling the comp's
+    gaps) and leaves LEAD/BASS/PERCUSSION untouched; the HARMONY list stays
+    monophonic and the original comp note is preserved."""
+    audio = tmp_path / "song.wav"
+    _tiny_song(audio)
+    _patch_common(monkeypatch)
+
+    def fake_pitched(stem, sr, role, min_duration=0.0):
+        if role is Role.BASS:
+            return [NoteEvent(33, 0.0, 0.4, 64, Role.BASS)]
+        return [NoteEvent(48, 0.0, 0.4, 64, Role.HARMONY)]  # one comp note, gap after 0.4
+
+    monkeypatch.setattr(bs, "transcribe_pitched", fake_pitched)
+    monkeypatch.setattr(
+        bs, "transcribe_vocals",
+        lambda stem, sr, fmin, fmax, min_duration=0.06: [NoteEvent(67, 0.0, 0.5, 80, Role.LEAD)],
+    )
+
+    # transcribe mode = predictable HARMONY (the raw fake note); declash off so
+    # the echo pitch is not octave-shifted, keeping the assertions simple.
+    cfg = load_config()
+    cfg = replace(
+        cfg,
+        arrange=replace(cfg.arrange, harmony_mode="transcribe"),
+        analysis=replace(cfg.analysis, harmony_declash=False),
+    )
+    off = build_score(audio, replace(cfg, echo=replace(cfg.echo, enabled=False)))
+    on = build_score(audio, replace(cfg, echo=replace(cfg.echo, enabled=True)))
+
+    for role in (Role.LEAD, Role.BASS, Role.PERCUSSION):
+        assert on.notes_with_role(role) == off.notes_with_role(role), f"{role} must be untouched"
+
+    off_harm = off.notes_with_role(Role.HARMONY)
+    on_harm = sorted(on.notes_with_role(Role.HARMONY), key=lambda n: n.start)
+    assert len(on_harm) > len(off_harm), "echo must add at least one HARMONY note"
+    assert off_harm[0] in on_harm, "comp note preserved (comp wins)"
+    for a, b in zip(on_harm, on_harm[1:]):
+        assert a.end <= b.start, "HARMONY must stay strictly monophonic"
+
+
+def test_phantom_echo_disabled_leaves_harmony_identical_to_the_comp(monkeypatch, tmp_path):
+    """The default (disabled) path is a no-op: HARMONY equals the plain comp."""
+    audio = tmp_path / "song.wav"
+    _tiny_song(audio)
+    _patch_common(monkeypatch)
+
+    def fake_pitched(stem, sr, role, min_duration=0.0):
+        if role is Role.BASS:
+            return [NoteEvent(33, 0.0, 0.4, 64, Role.BASS)]
+        return [NoteEvent(48, 0.0, 0.4, 64, Role.HARMONY)]
+
+    monkeypatch.setattr(bs, "transcribe_pitched", fake_pitched)
+    monkeypatch.setattr(
+        bs, "transcribe_vocals",
+        lambda stem, sr, fmin, fmax, min_duration=0.06: [NoteEvent(67, 0.0, 0.5, 80, Role.LEAD)],
+    )
+
+    cfg = load_config()  # echo disabled by default
+    cfg = replace(
+        cfg,
+        arrange=replace(cfg.arrange, harmony_mode="transcribe"),
+        analysis=replace(cfg.analysis, harmony_declash=False),
+    )
+    score = build_score(audio, cfg)
+    harm = score.notes_with_role(Role.HARMONY)
+    assert harm == [NoteEvent(48, 0.0, 0.4, 64, Role.HARMONY)]  # untouched comp only
+
+
+def test_phantom_echo_survives_rest_on_busy_melody(monkeypatch, tmp_path):
+    """Echo runs AFTER rest_harmony_on_busy_melody and is exempt from it: with a
+    lead spanning the song and rest-on-busy stripping the comp, the delayed
+    echoes still populate HARMONY (the echo re-states the melody by design)."""
+    audio = tmp_path / "song.wav"
+    _tiny_song(audio)
+    _patch_common(monkeypatch)
+
+    def fake_pitched(stem, sr, role, min_duration=0.0):
+        if role is Role.BASS:
+            return [NoteEvent(33, 0.0, 0.4, 64, Role.BASS)]
+        return [NoteEvent(48, 0.0, 0.4, 64, Role.HARMONY)]
+
+    monkeypatch.setattr(bs, "transcribe_pitched", fake_pitched)
+    monkeypatch.setattr(
+        bs, "transcribe_vocals",
+        lambda stem, sr, fmin, fmax, min_duration=0.06: [NoteEvent(67, 0.0, 1.0, 80, Role.LEAD)],
+    )
+
+    cfg = load_config()
+    cfg = replace(
+        cfg,
+        arrange=replace(cfg.arrange, harmony_mode="transcribe",
+                        harmony_rest_on_busy_melody=True),
+        analysis=replace(cfg.analysis, harmony_declash=False),
+        echo=replace(cfg.echo, enabled=True),
+    )
+    score = build_score(audio, cfg)
+    harm = sorted(score.notes_with_role(Role.HARMONY), key=lambda n: n.start)
+    assert any(n.pitch == 67 for n in harm), "the delayed lead echo must survive the rest pass"
+    for a, b in zip(harm, harm[1:]):
+        assert a.end <= b.start
