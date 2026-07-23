@@ -58,6 +58,17 @@ def test_echo_change_flips_the_analysis_signature():
     )
 
 
+def test_echo_field_change_flips_the_analysis_signature():
+    # Not just `enabled`: every EchoConfig field is hashed (via vars(cfg.echo)) and
+    # is analysis-affecting (it changes the echo notes), so a non-enabled field
+    # change must also re-analyze. Locks against a refactor that hashes only `enabled`.
+    base = config_from_overrides({"echo": {"enabled": True}})
+    slower = config_from_overrides({"echo": {"enabled": True, "delay_frames": 8}})
+    assert _analysis_signature(slower) != _analysis_signature(base), (
+        "an echo delay_frames change must re-analyze (it changes the Score's echo notes)"
+    )
+
+
 def test_synthesis_change_still_keeps_signature_stable_with_echo_in_the_blob():
     base = config_from_overrides({})
     synth = config_from_overrides({"levels": {"noise": 0.2}})
