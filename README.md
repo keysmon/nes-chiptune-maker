@@ -78,8 +78,9 @@ Two flavors:
 **Hosted playground (Vercel)** - live at **https://web-demo-sandy-nine.vercel.app**.
 Source in `web-demo/`. The heavy analysis (Demucs + basic-pitch: GPU, big models,
 CoreML) can't run on serverless, so the hosted version ships a library of
-*pre-analyzed* Creative-Commons sample songs - instrumental and vocal (see
-`web-demo/CREDITS.md` for the CC-BY / CC0 credits) - and runs only the light,
+*pre-analyzed* Creative-Commons sample songs - instrumental, vocal, and
+public-domain Chinese folk (茉莉花, 送别) (see `web-demo/CREDITS.md` for the
+CC-BY / CC0 / public-domain credits) - and runs only the light,
 deterministic synthesis half per request (pure numpy/scipy; WAV written with the
 stdlib `wave` module so there's no libsndfile dependency). Pick a sample song,
 toggle the **heuristic / AI** arrangement, and tune the synthesis controls live;

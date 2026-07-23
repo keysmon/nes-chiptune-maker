@@ -37,6 +37,10 @@ app = FastAPI(title="Chiptune Maker playground")
 
 
 def _load_score(song: str, harmony: str) -> Score:
+    # Defense in depth: `song`/`harmony` compose a file path below, so never
+    # trust them even from internal callers - slug + whitelist block traversal.
+    if not _SLUG.match(song) or harmony not in _VALID_HARMONY:
+        raise HTTPException(400, "bad song or harmony id")
     key = f"{song}-{harmony}"
     if key not in _SCORES:
         path = os.path.join(_BASE, "scores", f"{key}.json")
@@ -109,10 +113,32 @@ def original(song: str):
     return FileResponse(path, media_type="audio/mpeg")
 
 
+_MAX_OVERRIDE_KEYS = 64
+_MAX_OVERRIDE_DEPTH = 5
+
+
+def _guard_overrides(o, depth: int = 0) -> None:
+    """Cap the shape of the untrusted `overrides` body before it reaches
+    _deep_merge / config validation - blocks deep-nesting and key-flood abuse
+    (the values themselves are range-checked downstream by config_from_dict)."""
+    if depth > _MAX_OVERRIDE_DEPTH:
+        raise HTTPException(400, "overrides nested too deeply")
+    if isinstance(o, (dict, list)):
+        if len(o) > _MAX_OVERRIDE_KEYS:
+            raise HTTPException(400, "override payload too large")
+        for v in (o.values() if isinstance(o, dict) else o):
+            _guard_overrides(v, depth + 1)
+
+
 @app.post("/api/render")
 def render(req: RenderRequest):
+    # `song` composes a filesystem path in _load_score - validate it here too
+    # (path-traversal guard), like /original/{song} already does.
+    if not _SLUG.match(req.song):
+        raise HTTPException(400, "bad song id")
     if req.harmony not in _VALID_HARMONY:
         raise HTTPException(400, f"harmony must be one of {_VALID_HARMONY}")
+    _guard_overrides(req.overrides or {})
     score = _load_score(req.song, req.harmony)
     wav = _render(score, req.overrides or {})
     return Response(content=wav, media_type="audio/wav")
